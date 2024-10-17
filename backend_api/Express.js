@@ -15,7 +15,7 @@ const upload = multer({ storage: storage });
 const connection = await mysql.createConnection({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'Dowmean',
-  password: process.env.DB_PASS || 'Dowmean.1006', // ต้องมีรหัสผ่านที่ถูกต้อง
+  password: process.env.DB_PASS || '', // ต้องมีรหัสผ่านที่ถูกต้อง
   database: process.env.DB_NAME || 'hiwmai'
 });
 console.log("DB_USER: ", process.env.DB_USER);
