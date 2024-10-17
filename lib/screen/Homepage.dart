@@ -8,11 +8,11 @@ class HomepageScreen extends StatefulWidget {
 class _HomepageState extends State<HomepageScreen> {
   int _selectedIndex = 0;
 
-  // Sample list of images for the carousel
+  // Sample list of images for the carousel (corrected)
   final List<String> carouselImages = [
-    'carousel1.png',
-    'carousel2.png',
-    'https://example.com/carousel3.png',
+    'assets/images/carousel1.png', // Use assets for local images
+    'assets/images/carousel2.png',
+    'https://example.com/carousel3.png', // URL for web image
   ];
 
   @override
@@ -53,10 +53,18 @@ class _HomepageState extends State<HomepageScreen> {
               child: PageView.builder(
                 itemCount: carouselImages.length,
                 itemBuilder: (context, index) {
-                  return Image.network(
-                    carouselImages[index],
-                    fit: BoxFit.cover,
-                  );
+                  // Use Image.asset for local images
+                  if (carouselImages[index].startsWith('assets')) {
+                    return Image.asset(
+                      carouselImages[index],
+                      fit: BoxFit.cover,
+                    );
+                  } else {
+                    return Image.network(
+                      carouselImages[index],
+                      fit: BoxFit.cover,
+                    );
+                  }
                 },
               ),
             ),
@@ -180,7 +188,7 @@ class _HomepageState extends State<HomepageScreen> {
             children: [
               Text(name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
-              Text('ราคา: ฿$price', style: TextStyle(fontSize: 14, color: Colors.pink)),
+              Text('ราคา: ฿price', style: TextStyle(fontSize: 14, color: Colors.pink)),
             ],
           )
         ],
@@ -188,4 +196,3 @@ class _HomepageState extends State<HomepageScreen> {
     );
   }
 }
-

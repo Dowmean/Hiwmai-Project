@@ -1,14 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart'; // นำเข้า cloud_firestore สำหรับ Timestamp
+import 'package:mysql1/mysql1.dart'; // Import mysql1 for MySQL
 
 class PostModel {
-  String? id; // ID ของเอกสาร (อาจสร้างในภายหลัง)
+  int? id; // Use int for MySQL ID
   String userName;
   String userId;
   String category;
   String productName;
   String productDescription;
   double price;
-  String? imageUrl;
+  List<int>? imageUrl; // Change to binary (List<int>) to handle BLOBs
   DateTime postedDate;
 
   PostModel({
@@ -19,26 +19,26 @@ class PostModel {
     required this.productName,
     required this.productDescription,
     required this.price,
-    this.imageUrl,
+    this.imageUrl, // Nullable for optional image
     required this.postedDate,
   });
 
-  // สร้างฟังก์ชันจาก Map (ดึงข้อมูลจาก Firestore)
-  factory PostModel.fromMap(Map<String, dynamic> data, String documentId) {
+  // Create from Map (used to retrieve from MySQL)
+  factory PostModel.fromMap(ResultRow row) {
     return PostModel(
-      id: documentId,
-      userName: data['userName'],
-      userId: data['userId'],
-      category: data['category'],
-      productName: data['productName'],
-      productDescription: data['productDescription'],
-      price: data['price'].toDouble(),
-      imageUrl: data['imageUrl'],
-      postedDate: (data['postedDate'] as Timestamp).toDate(), // แปลง Timestamp เป็น DateTime
+      id: row['id'],
+      userName: row['userName'],
+      userId: row['userId'],
+      category: row['category'],
+      productName: row['productName'],
+      productDescription: row['productDescription'],
+      price: row['price'],
+      imageUrl: row['imageUrl'] != null ? (row['imageUrl'] as Blob).toBytes() : null, // Handle BLOB conversion
+      postedDate: DateTime.parse(row['postedDate']),
     );
   }
 
-  // แปลงข้อมูลเป็น Map (เขียนข้อมูลลง Firestore)
+  // Convert to Map (for writing to MySQL)
   Map<String, dynamic> toMap() {
     return {
       'userName': userName,
@@ -47,8 +47,17 @@ class PostModel {
       'productName': productName,
       'productDescription': productDescription,
       'price': price,
-      'imageUrl': imageUrl,
-      'postedDate': postedDate,
+      'imageUrl': imageUrl, // Send binary data (BLOB)
+      'postedDate': postedDate.toIso8601String(),
     };
+  }
+
+  // Insert data into MySQL
+  Future<void> insertToMySQL(MySqlConnection connection) async {
+    var result = await connection.query(
+      'INSERT INTO product (userName, userId, category, productName, productDescription, price, imageUrl, postedDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userName, userId, category, productName, productDescription, price, imageUrl, postedDate.toIso8601String()],
+    );
+    id = result.insertId; // Store the newly created ID
   }
 }

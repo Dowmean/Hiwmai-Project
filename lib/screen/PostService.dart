@@ -1,64 +1,51 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import "package:cloud_firestore/cloud_firestore.dart";
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:loginsystem/model/PostModel.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:io';
 
 class PostService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final String apiUrl = 'http://10.0.2.2:3000/createpost'; // Changed to 10.0.2.2
 
-  // ฟังก์ชันสำหรับอัปโหลดรูปภาพ
-  Future<String?> uploadImage(File imageFile) async {
-    try {
-      String fileName = DateTime.now().millisecondsSinceEpoch.toString();
-      Reference storageReference =
-          _storage.ref().child('product_images/$fileName');
-      UploadTask uploadTask = storageReference.putFile(imageFile);
-      TaskSnapshot snapshot = await uploadTask.whenComplete(() {});
-      String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      print("Error uploading image: $e");
-      return null;
-    }
-  }
-
-  // ฟังก์ชันสำหรับการสร้างโพสต์
+  // Function to create a post
   Future<void> createPost({
     required String category,
     required String productName,
     required String productDescription,
     required double price,
-    File? imageFile, // รูปภาพจากผู้ใช้ (หากมี)
+    File? imageFile,
   }) async {
-    User? user = _auth.currentUser; // ดึงข้อมูลผู้ใช้ที่ล็อกอิน
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
+    List<int>? imageBytes;
 
-    String? imageUrl;
-
-    // อัปโหลดรูปภาพถ้ามี
+    // Convert image to binary if provided
     if (imageFile != null) {
-      imageUrl = await uploadImage(imageFile);
+      imageBytes = await imageFile.readAsBytes();
     }
 
-    // สร้างข้อมูลโพสต์ใหม่
-    PostModel newPost = PostModel(
-      userName: user.email!, // ใช้อีเมลของผู้ใช้ที่ล็อกอิน
-      userId: user.uid,
-      category: category,
-      productName: productName,
-      productDescription: productDescription,
-      price: price,
-      imageUrl: imageUrl,
-      postedDate: DateTime.now(),
-    );
+    // Build the post data
+    Map<String, dynamic> postData = {
+      'userName': 'user@example.com', // Example username
+      'userId': '12345', // Example user ID
+      'category': category,
+      'productName': productName,
+      'productDescription': productDescription,
+      'price': price,
+      'imageUrl': imageBytes != null ? base64Encode(imageBytes) : null, // Base64 image data
+    };
 
-    // บันทึกข้อมูลโพสต์ลง Firestore
-    await _firestore.collection('posts').add(newPost.toMap());
-    print("Post created successfully");
+    // Send POST request to the backend
+    try {
+      var response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(postData),
+      );
+
+      if (response.statusCode == 200) {
+        print("Post created successfully");
+      } else {
+        print("Failed to create post: ${response.body}");
+      }
+    } catch (e) {
+      print("Error submitting post: $e");
+    }
   }
 }

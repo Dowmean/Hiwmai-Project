@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
+import 'package:loginsystem/screen/PostCreate.dart';
+import 'package:loginsystem/screen/ProductListPage.dart'; 
 import 'package:loginsystem/screen/login.dart';
 import 'package:loginsystem/screen/register.dart';
-import 'package:loginsystem/screen/createpost.dart';  // นำเข้า CreatePostPage
-import 'package:loginsystem/screen/product.dart';  // นำเข้า ProductPage
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -73,7 +73,7 @@ class HomeScreen extends StatelessWidget {
                     Navigator.push(
                       context, 
                       MaterialPageRoute(builder: (context) {
-                        return ProductPage();  // นำทางไปยังหน้า ProductPage
+                        return ProductListPage();  // นำทางไปยังหน้า ProductPage
                       })
                     );
                   },

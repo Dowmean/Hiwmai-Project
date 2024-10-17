@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase core
+import 'package:loginsystem/screen/PostCreate.dart';
 import 'package:loginsystem/screen/home.dart';  // ตรวจสอบว่าเส้นทางถูกต้อง
-import 'package:loginsystem/screen/createpost.dart';  // เพิ่มเส้นทางไปยัง CreatePostPage
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is initialized
