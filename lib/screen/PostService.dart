@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 class PostService {
-  final String apiUrl = 'http://10.0.2.2:3000/createpost'; // Changed to 10.0.2.2
+  final String apiUrl = 'http://10.0.2.2:3000/createpost'; // URL สำหรับการสร้างโพสต์
 
   // Function to create a post
   Future<void> createPost({
@@ -46,6 +46,58 @@ class PostService {
       }
     } catch (e) {
       print("Error submitting post: $e");
+    }
+  }
+
+  // ฟังก์ชันสำหรับแก้ไขโพสต์
+  Future<void> editPost(int id, {
+    required String productName,
+    required String productDescription,
+    required double price,
+    required String category,
+    String? imageUrl,
+  }) async {
+    try {
+      Map<String, dynamic> postData = {
+        'productName': productName,
+        'productDescription': productDescription,
+        'price': price,
+        'category': category,
+        'imageUrl': imageUrl ?? '',
+      };
+
+      // ใช้ URL โดยตรงสำหรับแก้ไขโพสต์ โดยรวม id ใน URL
+      var response = await http.put(
+        Uri.parse('http://10.0.2.2:3000/editpost/$id'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(postData),
+      );
+
+      if (response.statusCode == 200) {
+        print("Post updated successfully");
+      } else {
+        print("Failed to update post: ${response.body}");
+      }
+    } catch (e) {
+      print("Error updating post: $e");
+    }
+  }
+
+  // ฟังก์ชันสำหรับลบโพสต์
+  Future<void> deletePost(int id) async {
+    try {
+      // ใช้ URL โดยตรงสำหรับลบโพสต์ โดยรวม id ใน URL
+      var response = await http.delete(
+        Uri.parse('http://10.0.2.2:3000/deletepost/$id'),
+      );
+
+      if (response.statusCode == 200) {
+        print("Post deleted successfully");
+      } else {
+        print("Failed to delete post: ${response.body}");
+      }
+    } catch (e) {
+      print("Error deleting post: $e");
     }
   }
 }

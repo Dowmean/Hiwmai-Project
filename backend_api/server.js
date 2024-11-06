@@ -55,6 +55,45 @@ app.post('/createpost', async (req, res) => {
   }
 });
 
+// API สำหรับแก้ไขโพสต์
+app.put('/editpost/:id', async (req, res) => {
+  const { id } = req.params;
+  const { productName, productDescription, price, category, imageUrl } = req.body;
+
+  if (!productName || !productDescription || !price || !category) {
+    return res.status(400).send('Missing required fields');
+  }
+
+  try {
+    const connection = await getConnection();
+    const sql = 'UPDATE product SET productName = ?, productDescription = ?, price = ?, category = ?, imageUrl = ? WHERE id = ?';
+    await connection.query(sql, [productName, productDescription, price, category, imageUrl, id]);
+    await connection.end();
+    res.send('Post updated successfully');
+  } catch (err) {
+    console.error('Error updating post:', err);
+    res.status(500).send('Internal Server Error: ' + err.message);
+  }
+});
+
+
+// API สำหรับลบโพสต์
+app.delete('/deletepost/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const connection = await getConnection();
+    const sql = 'DELETE FROM product WHERE id = ?';
+    await connection.query(sql, [id]);
+    await connection.end();
+    res.send('Post deleted successfully');
+  } catch (err) {
+    console.error('Error deleting post:', err);
+    res.status(500).send('Internal Server Error: ' + err.message);
+  }
+});
+
+
 // Get products route
 app.get('/getproduct', async (req, res) => {
   try {

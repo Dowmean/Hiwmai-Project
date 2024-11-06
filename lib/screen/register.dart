@@ -1,58 +1,50 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:loginsystem/model/Profile.dart';
-import 'package:loginsystem/screen/home.dart';
-import 'package:loginsystem/screen/login.dart'; 
+import 'ProfileSetup.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({Key? key}) : super(key: key);
 
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final formkey = GlobalKey<FormState>();
-  Profile profile = Profile(email: '', password: '');
-  final Future<FirebaseApp> firebase = Firebase.initializeApp();
-  String errorMessage = ''; // เพิ่มตัวแปรเพื่อเก็บข้อความแสดงข้อผิดพลาด
-  bool _isPasswordVisible = false; // เพิ่มการแสดง/ซ่อนรหัสผ่าน
+  final formKey = GlobalKey<FormState>();
+  String email = '';
+  String password = '';
+  String errorMessage = '';
+  bool _isPasswordVisible = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: firebase,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text("Error"),
-            ),
-            body: Center(
-              child: Text("${snapshot.error}"),
+  Future<void> _register() async {
+    if (formKey.currentState!.validate()) {
+      formKey.currentState!.save();
+      try {
+        // สร้างผู้ใช้ใน Firebase Authentication
+        UserCredential userCredential = await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(email: email, password: password);
+
+        // นำทางไปยังหน้า ProfileSetupScreen เมื่อสำเร็จ
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfileSetupScreen(userCredential.user!),
             ),
           );
         }
-
-        if (snapshot.connectionState == ConnectionState.done) {
-          return _buildRegistrationForm();
+      } on FirebaseAuthException catch (e) {
+        if (mounted) {
+          setState(() {
+            errorMessage = e.message ?? 'เกิดข้อผิดพลาดในการลงทะเบียน';
+          });
         }
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text("Loading..."),
-          ),
-          body: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-      },
-    );
+      }
+    }
   }
 
-  Widget _buildRegistrationForm() {
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -61,10 +53,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.pink),
           onPressed: () {
-            Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (context) {
-              return const LoginScreen(); // ย้อนกลับไปหน้าเข้าสู่ระบบ
-            }));
+            Navigator.pop(context);
           },
         ),
       ),
@@ -73,7 +62,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: SingleChildScrollView(
             child: Form(
-              key: formkey,
+              key: formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -101,8 +90,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                    onSaved: (String? email) {
-                      profile.email = email!;
+                    onSaved: (value) {
+                      email = value!;
                     },
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.email),
@@ -129,8 +118,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                    onSaved: (String? password) {
-                      profile.password = password!;
+                    onSaved: (value) {
+                      password = value!;
                     },
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock),
@@ -152,57 +141,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'สร้างรหัสผ่านที่มีตัวอักษรและตัวเลขอย่างน้อย 6 ตัว',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
                   const SizedBox(height: 40),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () async {
-                        if (formkey.currentState!.validate()) {
-                          formkey.currentState!.save(); // บันทึกค่าลงใน profile
-                          try {
-                            await FirebaseAuth.instance
-                                .createUserWithEmailAndPassword(
-                              email: profile.email,
-                              password: profile.password,
-                            )
-                                .then((Value) {
-                              // เคลียร์ฟอร์มหลังจากลงทะเบียน
-                              formkey.currentState!.reset();
-                              Fluttertoast.showToast(
-                                msg: "ลงทะเบียนสำเร็จ",
-                                gravity: ToastGravity.CENTER,
-                              );
-                              Navigator.pushReplacement(context,
-                                  MaterialPageRoute(builder: (context) {
-                                return HomeScreen();
-                              }));
-                            });
-                            setState(() {
-                              profile = Profile(
-                                  email: '',
-                                  password: ''); // เคลียร์ตัวแปร profile
-                              errorMessage =
-                                  ''; // รีเซ็ตข้อความข้อผิดพลาดเมื่อสมัครสำเร็จ
-                            });
-                          } on FirebaseAuthException catch (e) {
-                            setState(() {
-                              errorMessage = e.message ??
-                                  'เกิดข้อผิดพลาด'; // จัดการข้อผิดพลาดและแสดงผล
-                            });
-                          }
-                        }
-                      },
+                      onPressed: _register,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        backgroundColor: Colors.pinkAccent, // สีปุ่ม
+                        backgroundColor: Colors.pinkAccent,
                       ),
                       child: const Text(
                         "ถัดไป",
@@ -210,12 +159,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  if (errorMessage.isNotEmpty) // แสดงข้อความข้อผิดพลาดถ้ามี
+                  if (errorMessage.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Text(
                         errorMessage,
-                        style: TextStyle(color: Colors.red),
+                        style: const TextStyle(color: Colors.red),
                       ),
                     ),
                 ],
