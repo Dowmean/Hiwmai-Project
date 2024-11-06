@@ -1,3 +1,4 @@
+node_modules/
 gradle-wrapper.jar
 /.gradle
 /captures/
