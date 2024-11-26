@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'ProductService.dart'; // Assuming the ProductService is in the same directory
-import 'ProductDetailPage.dart'; // เพิ่ม import สำหรับหน้ารายละเอียดสินค้า
+import 'package:firebase_auth/firebase_auth.dart';
+import 'ProductService.dart';
+import 'ProductDetailPage.dart';
 
 class ProductListPage extends StatefulWidget {
   @override
@@ -9,49 +11,141 @@ class ProductListPage extends StatefulWidget {
 }
 
 class _ProductListPageState extends State<ProductListPage> {
-  late Future<List<dynamic>> _productList;
+  late Future<List<dynamic>> _favoriteProducts = Future.value([]); // Default value
+  String email = '';
 
   @override
   void initState() {
     super.initState();
-    _productList = ProductService().fetchProducts(); // Fetch products when page is loaded
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _fetchUserEmail();
+    _fetchFavorites(); // Fetch user favorites
+  }
+
+  Future<void> _fetchUserEmail() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      setState(() {
+        email = user.email ?? '';
+      });
+      print('User email: $email');
+    } else {
+      print('No user is currently logged in.');
+    }
+  }
+
+  void _fetchFavorites() {
+    if (email.isNotEmpty) {
+      _favoriteProducts = ProductService().getFavorites(email).then((favoriteIds) {
+        final uniqueIds = favoriteIds.toSet().toList(); // Remove duplicates
+        print('Unique Favorite IDs: $uniqueIds'); // Debugging
+
+        if (uniqueIds.isEmpty) {
+          print('No product IDs to fetch.'); // Debugging
+          return Future.value([]); // Return an empty Future<List>
+        } else {
+          return ProductService().fetchProductsByIds(uniqueIds).then((products) {
+            print('Fetched products: $products'); // Debugging
+            return products; // Return the fetched products
+          }).catchError((e) {
+            print('Error fetching products: $e'); // Error logging
+            return []; // Return empty list on error
+          });
+        }
+      }).catchError((e) {
+        print('Error fetching favorites: $e'); // Error logging
+        return []; // Return empty list on error
+      });
+    } else {
+      print('No email found, skipping fetch.');
+      _favoriteProducts = Future.value([]); // Return empty list if no email
+    }
+  }
+
+  Widget _buildProductImage(dynamic imageUrl) {
+    try {
+      if (imageUrl is Map && imageUrl['data'] != null) {
+        Uint8List imageData = Uint8List.fromList(List<int>.from(imageUrl['data']));
+        return Image.memory(
+          imageData,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 120,
+        );
+      } else if (imageUrl is String) {
+        if (imageUrl.startsWith('data:image')) {
+          return Image.memory(
+            base64Decode(imageUrl.split(',').last),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 120,
+          );
+        } else {
+          return Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 120,
+          );
+        }
+      }
+    } catch (e) {
+      print('Error decoding image: $e'); // Error logging
+    }
+    return Container(
+      color: Colors.grey[200],
+      height: 120,
+      child: Icon(Icons.broken_image, size: 50),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Products"),
+        title: Text('รายการโปรดของคุณ'),
       ),
       body: FutureBuilder<List<dynamic>>(
-        future: _productList,
+        future: _favoriteProducts,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator()); // Show loading spinner while fetching data
+            return Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error fetching products: ${snapshot.error}'));
+            return Center(
+              child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'),
+            );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No products found'));
+            return Center(child: Text('ไม่มีรายการโปรด'));
           } else {
-            // Product data is available
+            // เปลี่ยนจาก ListView เป็น GridView
             return GridView.builder(
               padding: EdgeInsets.all(8.0),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 columns
+                crossAxisCount: 2, // จำนวนคอลัมน์ใน Grid
                 crossAxisSpacing: 10.0,
                 mainAxisSpacing: 10.0,
-                childAspectRatio: 0.75, // Control the height/width ratio
+                childAspectRatio: 0.75, // ปรับอัตราส่วนความกว้าง/สูง
               ),
               itemCount: snapshot.data!.length,
               itemBuilder: (context, index) {
-                var product = snapshot.data![index];
+                final product = snapshot.data![index];
                 return GestureDetector(
                   onTap: () {
-                    // นำไปยังหน้ารายละเอียดสินค้าเมื่อคลิกที่รายการ
+                    // ไปยังหน้ารายละเอียดสินค้า
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ProductDetailPage(product: product),
+                        builder: (context) => ProductDetailPage(
+                          product: product,
+                          onFavoriteUpdate: (_) {
+                            setState(() {
+                              _fetchFavorites(); // Update favorites after edit
+                            });
+                          },
+                        ),
                       ),
                     );
                   },
@@ -65,29 +159,13 @@ class _ProductListPageState extends State<ProductListPage> {
                       children: [
                         // Image section
                         Expanded(
-                          child: product['imageUrl'] != null &&
-                                  product['imageUrl'] is String &&
-                                  product['imageUrl'].isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-                                  child: Image.memory(
-                                    base64Decode(product['imageUrl']),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: 120,
-                                  ),
-                                )
-                              : Container(
-                                  color: Colors.grey[200],
-                                  height: 120,
-                                  child: Icon(Icons.image, size: 50),
-                                ),
+                          child: _buildProductImage(product['imageUrl']),
                         ),
                         // Text section
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: Text(
-                            product['productName'],
+                            product['productName'] ?? 'ไม่มีชื่อสินค้า',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -99,20 +177,10 @@ class _ProductListPageState extends State<ProductListPage> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8.0),
                           child: Text(
-                            "Price: \$${product['price']}",
+                            "฿${product['price'] ?? 'ไม่มีราคา'}",
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          child: Text(
-                            product['category'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
                             ),
                           ),
                         ),

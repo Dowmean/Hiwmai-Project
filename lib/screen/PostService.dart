@@ -5,7 +5,7 @@ import 'dart:io';
 class PostService {
   final String apiUrl = 'http://10.0.2.2:3000/createpost'; // URL สำหรับการสร้างโพสต์
 
-  // Function to create a post
+  // ฟังก์ชันสำหรับสร้างโพสต์ใหม่
   Future<void> createPost({
     required String category,
     required String productName,
@@ -13,25 +13,29 @@ class PostService {
     required double price,
     File? imageFile,
   }) async {
+    // ตรวจสอบและแปลงรูปภาพเป็น binary
     List<int>? imageBytes;
-
-    // Convert image to binary if provided
     if (imageFile != null) {
-      imageBytes = await imageFile.readAsBytes();
+      try {
+        imageBytes = await imageFile.readAsBytes();
+      } catch (e) {
+        print("Error reading image file: $e");
+        return;
+      }
     }
 
-    // Build the post data
+    // ข้อมูลของโพสต์
     Map<String, dynamic> postData = {
-      'userName': 'user@example.com', // Example username
-      'userId': '12345', // Example user ID
+      'userName': 'user@example.com', // ใช้ชื่อผู้ใช้ตัวอย่าง
+      'userId': '12345', // ใช้ ID ผู้ใช้ตัวอย่าง
       'category': category,
       'productName': productName,
       'productDescription': productDescription,
       'price': price,
-      'imageUrl': imageBytes != null ? base64Encode(imageBytes) : null, // Base64 image data
+      'imageUrl': imageBytes != null ? base64Encode(imageBytes) : null, // แปลงรูปภาพเป็น base64
     };
 
-    // Send POST request to the backend
+    // ส่งคำขอ POST ไปยัง backend
     try {
       var response = await http.post(
         Uri.parse(apiUrl),
@@ -50,23 +54,25 @@ class PostService {
   }
 
   // ฟังก์ชันสำหรับแก้ไขโพสต์
-  Future<void> editPost(int id, {
+  Future<void> editPost(
+    int id, {
     required String productName,
     required String productDescription,
     required double price,
     required String category,
     String? imageUrl,
   }) async {
-    try {
-      Map<String, dynamic> postData = {
-        'productName': productName,
-        'productDescription': productDescription,
-        'price': price,
-        'category': category,
-        'imageUrl': imageUrl ?? '',
-      };
+    // ข้อมูลของโพสต์ที่จะส่ง
+    Map<String, dynamic> postData = {
+      'productName': productName,
+      'productDescription': productDescription,
+      'price': price,
+      'category': category,
+      'imageUrl': imageUrl ?? '',
+    };
 
-      // ใช้ URL โดยตรงสำหรับแก้ไขโพสต์ โดยรวม id ใน URL
+    // ส่งคำขอ PUT ไปยัง backend เพื่อแก้ไขโพสต์
+    try {
       var response = await http.put(
         Uri.parse('http://10.0.2.2:3000/editpost/$id'),
         headers: {"Content-Type": "application/json"},
@@ -85,8 +91,8 @@ class PostService {
 
   // ฟังก์ชันสำหรับลบโพสต์
   Future<void> deletePost(int id) async {
+    // ส่งคำขอ DELETE ไปยัง backend เพื่อทำการลบโพสต์
     try {
-      // ใช้ URL โดยตรงสำหรับลบโพสต์ โดยรวม id ใน URL
       var response = await http.delete(
         Uri.parse('http://10.0.2.2:3000/deletepost/$id'),
       );
@@ -100,4 +106,30 @@ class PostService {
       print("Error deleting post: $e");
     }
   }
+
+  Future<List<int>> getFavorites(String email) async {
+  // API ดึงรายการโปรดตาม email
+  final response = await http.get(Uri.parse('http://example.com/favorites?email=$email'));
+  if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map<int>((item) => item['product_id'] as int).toList();
+  } else {
+    throw Exception('Failed to fetch favorites');
+  }
+}
+Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
+  final response = await http.post(
+    Uri.parse('http://example.com/productsByIds'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'product_ids': productIds}),
+  );
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception('Failed to fetch products');
+  }
+}
+
+
+  toggleFavoriteStatus({required String userId, required String productId, required bool isFavorite}) {}
 }
