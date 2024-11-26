@@ -11,7 +11,8 @@ class ProductListPage extends StatefulWidget {
 }
 
 class _ProductListPageState extends State<ProductListPage> {
-  late Future<List<dynamic>> _favoriteProducts = Future.value([]); // Default value
+  late Future<List<dynamic>> _favoriteProducts =
+      Future.value([]); // Default value
   String email = '';
 
   @override
@@ -39,43 +40,46 @@ class _ProductListPageState extends State<ProductListPage> {
 
   void _fetchFavorites() {
     if (email.isNotEmpty) {
-      _favoriteProducts = ProductService().getFavorites(email).then((favoriteIds) {
-        final uniqueIds = favoriteIds.toSet().toList(); // Remove duplicates
-        print('Unique Favorite IDs: $uniqueIds'); // Debugging
+      setState(() {
+        _favoriteProducts =
+            ProductService().getFavorites(email).then((favoriteIds) {
+          final uniqueIds = favoriteIds.toSet().toList();
+          print('Favorite IDs: $uniqueIds');
+          if (uniqueIds.isEmpty) return Future.value([]);
 
-        if (uniqueIds.isEmpty) {
-          print('No product IDs to fetch.'); // Debugging
-          return Future.value([]); // Return an empty Future<List>
-        } else {
-          return ProductService().fetchProductsByIds(uniqueIds).then((products) {
-            print('Fetched products: $products'); // Debugging
-            return products; // Return the fetched products
+          return ProductService()
+              .fetchProductsByIds(uniqueIds)
+              .then((products) {
+            print('Fetched products: $products');
+            return products;
           }).catchError((e) {
-            print('Error fetching products: $e'); // Error logging
-            return []; // Return empty list on error
+            print('Error fetching products: $e');
+            return [];
           });
-        }
-      }).catchError((e) {
-        print('Error fetching favorites: $e'); // Error logging
-        return []; // Return empty list on error
+        }).catchError((e) {
+          print('Error fetching favorites: $e');
+          return [];
+        });
       });
     } else {
       print('No email found, skipping fetch.');
-      _favoriteProducts = Future.value([]); // Return empty list if no email
+      setState(() {
+        _favoriteProducts = Future.value([]);
+      });
     }
   }
 
   Widget _buildProductImage(dynamic imageUrl) {
+    if (imageUrl == null) {
+      return Container(
+        color: Colors.grey[200],
+        height: 120,
+        child: Icon(Icons.broken_image, size: 50),
+      );
+    }
+
     try {
-      if (imageUrl is Map && imageUrl['data'] != null) {
-        Uint8List imageData = Uint8List.fromList(List<int>.from(imageUrl['data']));
-        return Image.memory(
-          imageData,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: 120,
-        );
-      } else if (imageUrl is String) {
+      if (imageUrl is String) {
         if (imageUrl.startsWith('data:image')) {
           return Image.memory(
             base64Decode(imageUrl.split(',').last),
@@ -91,9 +95,25 @@ class _ProductListPageState extends State<ProductListPage> {
             height: 120,
           );
         }
+      } else if (imageUrl is Map && imageUrl['data'] != null) {
+        Uint8List imageData =
+            Uint8List.fromList(List<int>.from(imageUrl['data']));
+        return Image.memory(
+          imageData,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 120,
+        );
+      } else if (imageUrl is Map && imageUrl['url'] != null) {
+        return Image.network(
+          imageUrl['url'],
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 120,
+        );
       }
     } catch (e) {
-      print('Error decoding image: $e'); // Error logging
+      print('Error decoding image: $e');
     }
     return Container(
       color: Colors.grey[200],
@@ -108,90 +128,95 @@ class _ProductListPageState extends State<ProductListPage> {
       appBar: AppBar(
         title: Text('รายการโปรดของคุณ'),
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: _favoriteProducts,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('ไม่มีรายการโปรด'));
-          } else {
-            // เปลี่ยนจาก ListView เป็น GridView
-            return GridView.builder(
-              padding: EdgeInsets.all(8.0),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // จำนวนคอลัมน์ใน Grid
-                crossAxisSpacing: 10.0,
-                mainAxisSpacing: 10.0,
-                childAspectRatio: 0.75, // ปรับอัตราส่วนความกว้าง/สูง
-              ),
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                final product = snapshot.data![index];
-                return GestureDetector(
-                  onTap: () {
-                    // ไปยังหน้ารายละเอียดสินค้า
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProductDetailPage(
-                          product: product,
-                          onFavoriteUpdate: (_) {
-                            setState(() {
-                              _fetchFavorites(); // Update favorites after edit
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Image section
-                        Expanded(
-                          child: _buildProductImage(product['imageUrl']),
-                        ),
-                        // Text section
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            product['productName'] ?? 'ไม่มีชื่อสินค้า',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            "฿${product['price'] ?? 'ไม่มีราคา'}",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          }
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _fetchFavorites();
         },
+        child: FutureBuilder<List<dynamic>>(
+          future: _favoriteProducts,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Center(child: Text('ไม่มีรายการโปรด'));
+            } else {
+              return GridView.builder(
+                padding: EdgeInsets.all(8.0),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10.0,
+                  mainAxisSpacing: 10.0,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final product = snapshot.data![index];
+                  final productName =
+                      product['productName']?.toString() ?? 'ไม่มีชื่อสินค้า';
+                  final price = product['price']?.toString() ?? 'ไม่มีราคา';
+                  final imageUrl = product['imageUrl'];
+
+                  return GestureDetector(
+                    onTap: () {
+                      // นำไปยังหน้ารายละเอียดสินค้าเมื่อคลิกที่รายการ
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductDetailPage(
+                            product: product,
+                            onFavoriteUpdate: (_) {
+                              // อัปเดตข้อมูลรายการโปรดใหม่เมื่อกลับมาจากหน้ารายละเอียด
+                              _fetchFavorites();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildProductImage(imageUrl),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              productName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text(
+                              "฿$price",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          },
+        ),
       ),
     );
   }
