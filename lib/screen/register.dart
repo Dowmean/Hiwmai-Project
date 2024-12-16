@@ -1,50 +1,59 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'ProfileSetup.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:loginsystem/model/Profile.dart';
+import 'package:loginsystem/screen/Homepage.dart';
+import 'package:loginsystem/screen/main.dart';
+import 'package:loginsystem/screen/login.dart'; 
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen(String s, {super.key});
 
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final formKey = GlobalKey<FormState>();
-  String email = '';
-  String password = '';
-  String errorMessage = '';
-  bool _isPasswordVisible = false;
-
-  Future<void> _register() async {
-    if (formKey.currentState!.validate()) {
-      formKey.currentState!.save();
-      try {
-        // สร้างผู้ใช้ใน Firebase Authentication
-        UserCredential userCredential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(email: email, password: password);
-
-        // นำทางไปยังหน้า ProfileSetupScreen เมื่อสำเร็จ
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProfileSetupScreen(userCredential.user!),
-            ),
-          );
-        }
-      } on FirebaseAuthException catch (e) {
-        if (mounted) {
-          setState(() {
-            errorMessage = e.message ?? 'เกิดข้อผิดพลาดในการลงทะเบียน';
-          });
-        }
-      }
-    }
-  }
+  final formkey = GlobalKey<FormState>();
+  Profile profile = Profile(email: '', password: '');
+  final Future<FirebaseApp> firebase = Firebase.initializeApp();
+  String errorMessage = ''; // เพิ่มตัวแปรเพื่อเก็บข้อความแสดงข้อผิดพลาด
+  bool _isPasswordVisible = false; // เพิ่มการแสดง/ซ่อนรหัสผ่าน
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: firebase,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text("Error"),
+            ),
+            body: Center(
+              child: Text("${snapshot.error}"),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.done) {
+          return _buildRegistrationForm();
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Loading..."),
+          ),
+          body: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRegistrationForm() {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -53,7 +62,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.pink),
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (context) {
+              return const LoginScreen(); // ย้อนกลับไปหน้าเข้าสู่ระบบ
+            }));
           },
         ),
       ),
@@ -62,7 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: SingleChildScrollView(
             child: Form(
-              key: formKey,
+              key: formkey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -90,8 +102,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                    onSaved: (value) {
-                      email = value!;
+                    onSaved: (String? email) {
+                      profile.email = email!;
                     },
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.email),
@@ -118,8 +130,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       }
                       return null;
                     },
-                    onSaved: (value) {
-                      password = value!;
+                    onSaved: (String? password) {
+                      profile.password = password!;
                     },
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock),
@@ -141,30 +153,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'สร้างรหัสผ่านที่มีตัวอักษรและตัวเลขอย่างน้อย 6 ตัว',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 40),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _register,
+                      onPressed: () async {
+                        if (formkey.currentState!.validate()) {
+                          formkey.currentState!.save(); // บันทึกค่าลงใน profile
+                          try {
+                            await FirebaseAuth.instance
+                                .createUserWithEmailAndPassword(
+                              email: profile.email,
+                              password: profile.password,
+                            )
+                                .then((Value) {
+                              // เคลียร์ฟอร์มหลังจากลงทะเบียน
+                              formkey.currentState!.reset();
+                              Fluttertoast.showToast(
+                                msg: "ลงทะเบียนสำเร็จ",
+                                gravity: ToastGravity.CENTER,
+                              );
+                              Navigator.pushReplacement(context,
+                                  MaterialPageRoute(builder: (context) {
+                                return LoginScreen();
+                              }));
+                            });
+                            setState(() {
+                              profile = Profile(
+                                  email: '',
+                                  password: ''); // เคลียร์ตัวแปร profile
+                              errorMessage =
+                                  ''; // รีเซ็ตข้อความข้อผิดพลาดเมื่อสมัครสำเร็จ
+                            });
+                          } on FirebaseAuthException catch (e) {
+                            setState(() {
+                              errorMessage = e.message ??
+                                  'เกิดข้อผิดพลาด'; // จัดการข้อผิดพลาดและแสดงผล
+                            });
+                          }
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        backgroundColor: Colors.pinkAccent,
+                        backgroundColor: Colors.pinkAccent, // สีปุ่ม
                       ),
                       child: const Text(
-                        "ถัดไป",
+                        "สมัครบัญชี",
                         style: TextStyle(fontSize: 18),
                       ),
                     ),
                   ),
-                  if (errorMessage.isNotEmpty)
+                  if (errorMessage.isNotEmpty) // แสดงข้อความข้อผิดพลาดถ้ามี
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Text(
                         errorMessage,
-                        style: const TextStyle(color: Colors.red),
+                        style: TextStyle(color: Colors.red),
                       ),
                     ),
                 ],

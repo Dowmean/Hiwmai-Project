@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase core
-import 'package:loginsystem/screen/PostCreate.dart';
-import 'package:loginsystem/screen/home.dart';  // ตรวจสอบว่าเส้นทางถูกต้อง
+import 'package:loginsystem/screen/login.dart';
+import 'package:loginsystem/screen/main.dart'; // ตรวจสอบว่าเส้นทางถูกต้อง
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is initialized
   await Firebase.initializeApp(); // Initialize Firebase
-  runApp(MainApp());
+  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {
@@ -19,9 +19,9 @@ class MainApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,  
       ),
-      home: HomeScreen(),  // เรียกใช้ HomeScreen เป็นหน้าแรก
+      home: const LoginScreen(),  // เรียกใช้ LoginScreen เป็นหน้าแรก
       routes: {
-        '/createPost': (context) => CreatePostPage(),  // เพิ่มเส้นทางไปยังหน้า CreatePostPage
+        '/main': (context) => MainScreen(email: '',), // ตรวจสอบว่าต้องการพารามิเตอร์หรือไม่
       },
     );
   }

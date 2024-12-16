@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:loginsystem/model/Profile.dart';
 import 'package:loginsystem/screen/HomePage.dart';
+import 'package:loginsystem/screen/main.dart';
 import 'package:loginsystem/screen/register.dart'; 
 
 class LoginScreen extends StatefulWidget {
@@ -170,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                               Navigator.pushReplacement(context,
                                   MaterialPageRoute(builder: (context) {
-                                return HomepageScreen(); // หน้าที่จะแสดงหลังเข้าสู่ระบบสำเร็จ
+                                return MainScreen(email: '',); // หน้าที่จะแสดงหลังเข้าสู่ระบบสำเร็จ
                               }));
                             });
                             setState(() {
@@ -213,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: () {
                         Navigator.pushReplacement(context,
                             MaterialPageRoute(builder: (context) {
-                          return RegisterScreen(); // นำไปยังหน้าสมัครใช้งาน
+                          return RegisterScreen(''); // นำไปยังหน้าสมัครใช้งาน
                         }));
                       },
                       child: const Text(

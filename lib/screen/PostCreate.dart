@@ -1,21 +1,25 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'image_util.dart'; // สำหรับการ resize รูปภาพ
-import 'PostService.dart'; // สำหรับการเชื่อมต่อกับการสร้างโพสต์
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // เพิ่ม Firebase Auth
+import 'PostService.dart';
 
-class CreatePostPage extends StatefulWidget {
+class PostCreatePage extends StatefulWidget {
   @override
-  _CreatePostPageState createState() => _CreatePostPageState();
+  _PostCreatePageState createState() => _PostCreatePageState();
 }
 
-class _CreatePostPageState extends State<CreatePostPage> {
+class _PostCreatePageState extends State<PostCreatePage> {
   final TextEditingController _productNameController = TextEditingController();
-  final TextEditingController _productDescriptionController = TextEditingController();
+  final TextEditingController _productDescriptionController =
+      TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   String? _selectedCategory;
   File? _selectedImageFile;
 
-  // ตัวเลือกหมวดหมู่
   List<DropdownMenuItem<String>> get _categoryItems {
     return [
       DropdownMenuItem(value: 'เสื้อผ้า', child: Text('เสื้อผ้า')),
@@ -25,19 +29,56 @@ class _CreatePostPageState extends State<CreatePostPage> {
     ];
   }
 
-  // เลือกรูปภาพจากแกลลอรี่และทำการ resize
+  Future<Uint8List?> compressImage(File imageFile) async {
+    final originalBytes = await imageFile.readAsBytes();
+
+    final compressedBytes = await FlutterImageCompress.compressWithList(
+      originalBytes,
+      quality: 70,
+      minWidth: 800,
+      minHeight: 800,
+    );
+
+    if (compressedBytes != null) {
+      print("Original size: ${originalBytes.length} bytes");
+      print("Compressed size: ${compressedBytes.length} bytes");
+    } else {
+      print("Compression failed");
+    }
+
+    return compressedBytes;
+  }
+
   Future<void> _pickImage() async {
-    File? resizedImage = await pickAndResizeImage(); // ใช้ฟังก์ชัน resize
-    if (resizedImage != null) {
-      setState(() {
-        _selectedImageFile = resizedImage;
-      });
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      final File originalFile = File(pickedFile.path);
+
+      print("Original file path: ${originalFile.path}");
+
+      final Uint8List? compressedBytes = await compressImage(originalFile);
+
+      if (compressedBytes != null) {
+        setState(() {
+          _selectedImageFile = originalFile; // ใช้ไฟล์ต้นฉบับสำหรับแสดงใน UI
+          print("Image selected successfully");
+        });
+      } else {
+        print("Image compression failed");
+      }
+    } else {
+      print("No image selected");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ไม่ได้เลือกรูปภาพ')),
+      );
     }
   }
 
-  // ฟังก์ชันส่งโพสต์ไปยังเซิร์ฟเวอร์
-  void _submitPost() async {
-    if (_selectedCategory == null || _productNameController.text.isEmpty || _priceController.text.isEmpty) {
+  Future<void> _submitPost() async {
+    if (_selectedCategory == null ||
+        _productNameController.text.isEmpty ||
+        _priceController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
       );
@@ -45,19 +86,41 @@ class _CreatePostPageState extends State<CreatePostPage> {
     }
 
     try {
+      // ดึง firebase_uid ของผู้ใช้ปัจจุบัน
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('User not logged in');
+        return;
+      }
+      final String firebaseUid = user.uid;
+
+      String? base64Image;
+      if (_selectedImageFile != null) {
+        base64Image = base64Encode(await _selectedImageFile!.readAsBytes());
+      }
+
+      // Log ข้อมูลที่กำลังส่ง
+      print("Submitting data:");
+      print("FirebaseUid: $firebaseUid");
+      print("Category: $_selectedCategory");
+      print("ProductName: ${_productNameController.text}");
+      print("ProductDescription: ${_productDescriptionController.text}");
+      print("Price: ${_priceController.text}");
+      print("ImageFile: $base64Image");
+
       await PostService().createPost(
+        firebaseUid: firebaseUid, // ส่ง firebase_uid
         category: _selectedCategory!,
         productName: _productNameController.text,
         productDescription: _productDescriptionController.text,
         price: double.parse(_priceController.text),
-        imageFile: _selectedImageFile, // ส่งรูปภาพ (ที่ถูก resize แล้ว)
+        imageFile: base64Image, // ส่ง Base64 ของรูปภาพ
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('สร้างโพสต์สำเร็จ!')),
       );
 
-      // รีเซ็ตข้อมูลหลังจากการโพสต์
       setState(() {
         _productNameController.clear();
         _productDescriptionController.clear();
@@ -66,6 +129,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
         _selectedImageFile = null;
       });
     } catch (e) {
+      print('Error while creating post: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้างโพสต์: $e')),
       );
@@ -114,7 +178,8 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       children: [
                         Icon(Icons.add_photo_alternate, size: 50),
                         SizedBox(height: 10),
-                        Text("เพิ่มแคปชั่นและรูปภาพของคุณ", style: TextStyle(fontSize: 16)),
+                        Text("เพิ่มแคปชั่นและรูปภาพของคุณ",
+                            style: TextStyle(fontSize: 16)),
                       ],
                     ),
                   ),
@@ -128,9 +193,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
               TextFormField(
                 controller: _productDescriptionController,
                 decoration: InputDecoration(labelText: 'รายละเอียดสินค้า'),
-                maxLines: 6, // เพิ่มจำนวนบรรทัดสูงสุดเป็น 6
-                minLines: 4, // ตั้งค่าจำนวนบรรทัดขั้นต่ำ
-                keyboardType: TextInputType.multiline, // ตั้งค่าให้พิมพ์ได้หลายบรรทัด
+                maxLines: 6,
+                minLines: 4,
+                keyboardType: TextInputType.multiline,
               ),
               SizedBox(height: 20),
               TextFormField(
@@ -154,7 +219,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _submitPost,
-                  child: Text("โพสต์", style: TextStyle(fontSize: 18,color: Colors.pink)),
+                  child: Text("โพสต์", style: TextStyle(fontSize: 18)),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(

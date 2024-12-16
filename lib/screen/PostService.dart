@@ -1,72 +1,74 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
 
 class PostService {
-  final String apiUrl = 'http://10.0.2.2:3000/createpost'; // URL สำหรับการสร้างโพสต์
+  final String baseUrl = 'http://10.0.2.2:3000';
+  final String apiUrl = 'http://10.0.2.2:3000/checkRoleAndOwnership';
+  
 
-  // Function to create a post
+
+  // Function to create a new post
   Future<void> createPost({
+    required String firebaseUid,
     required String category,
     required String productName,
     required String productDescription,
     required double price,
-    File? imageFile,
+    String? imageFile, // Base64-encoded image
   }) async {
-    List<int>? imageBytes;
+    final String apiUrl = '$baseUrl/createpost'; // Full API URL
 
-    // Convert image to binary if provided
-    if (imageFile != null) {
-      imageBytes = await imageFile.readAsBytes();
-    }
-
-    // Build the post data
+    // Data to send to the server
     Map<String, dynamic> postData = {
-      'userName': 'user@example.com', // Example username
-      'userId': '12345', // Example user ID
+      'firebase_uid': firebaseUid,
       'category': category,
       'productName': productName,
       'productDescription': productDescription,
       'price': price,
-      'imageUrl': imageBytes != null ? base64Encode(imageBytes) : null, // Base64 image data
+      'imageUrl': imageFile, // Can be null if no image
     };
 
-    // Send POST request to the backend
     try {
+      print("Sending data: ${json.encode(postData)}");
+
       var response = await http.post(
         Uri.parse(apiUrl),
         headers: {"Content-Type": "application/json"},
         body: json.encode(postData),
       );
 
-      if (response.statusCode == 200) {
-        print("Post created successfully");
+      // Handle response
+      if (response.statusCode == 201) {
+        print("Post created successfully: ${response.body}");
       } else {
-        print("Failed to create post: ${response.body}");
+        print("Failed to create post: ${response.statusCode}, ${response.body}");
       }
     } catch (e) {
       print("Error submitting post: $e");
     }
   }
 
+
   // ฟังก์ชันสำหรับแก้ไขโพสต์
-  Future<void> editPost(int id, {
+  Future<void> editPost(
+    int id, {
     required String productName,
     required String productDescription,
     required double price,
     required String category,
     String? imageUrl,
   }) async {
-    try {
-      Map<String, dynamic> postData = {
-        'productName': productName,
-        'productDescription': productDescription,
-        'price': price,
-        'category': category,
-        'imageUrl': imageUrl ?? '',
-      };
+    // ข้อมูลของโพสต์ที่จะส่ง
+    Map<String, dynamic> postData = {
+      'productName': productName,
+      'productDescription': productDescription,
+      'price': price,
+      'category': category,
+      'imageUrl': imageUrl ?? '',
+    };
 
-      // ใช้ URL โดยตรงสำหรับแก้ไขโพสต์ โดยรวม id ใน URL
+    // ส่งคำขอ PUT ไปยัง backend เพื่อแก้ไขโพสต์
+    try {
       var response = await http.put(
         Uri.parse('http://10.0.2.2:3000/editpost/$id'),
         headers: {"Content-Type": "application/json"},
@@ -85,8 +87,8 @@ class PostService {
 
   // ฟังก์ชันสำหรับลบโพสต์
   Future<void> deletePost(int id) async {
+    // ส่งคำขอ DELETE ไปยัง backend เพื่อทำการลบโพสต์
     try {
-      // ใช้ URL โดยตรงสำหรับลบโพสต์ โดยรวม id ใน URL
       var response = await http.delete(
         Uri.parse('http://10.0.2.2:3000/deletepost/$id'),
       );
@@ -100,4 +102,50 @@ class PostService {
       print("Error deleting post: $e");
     }
   }
+
+Future<List<int>> getFavorites(String email) async {
+  final url = Uri.parse('http://10.0.2.2:3000/favorites?email=$email'); // เปลี่ยน URL
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map<int>((item) => item['product_id'] as int).toList();
+    } else {
+      print('Failed to fetch favorites: ${response.body}');
+      throw Exception('Failed to fetch favorites');
+    }
+  } catch (e) {
+    print('Error fetching favorites: $e');
+    throw Exception('Error fetching favorites: $e');
+  }
+}
+
+Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
+  final url = Uri.parse('http://10.0.2.2:3000/getproduct/fetchByIds');
+  try {
+    print('Fetching products for IDs: $productIds');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'product_ids': productIds}),
+    ).timeout(Duration(seconds: 10)); // เพิ่ม timeout
+
+    if (response.statusCode == 200) {
+      final List<dynamic> products = jsonDecode(response.body);
+      print('Fetched products: $products');
+      return products;
+    } else {
+      print('Failed to fetch products: ${response.statusCode} - ${response.body}');
+      throw Exception('Failed to fetch products');
+    }
+  } catch (e) {
+    print('Error fetching products: $e');
+    throw Exception('Error fetching products: $e');
+  }
+}
+
+
+
+
+  toggleFavoriteStatus({required String userId, required String productId, required bool isFavorite}) {}
 }

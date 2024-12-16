@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'ProductService.dart'; // Assuming the ProductService is in the same directory
-import 'ProductDetailPage.dart'; // เพิ่ม import สำหรับหน้ารายละเอียดสินค้า
+import 'package:firebase_auth/firebase_auth.dart';
+import 'ProductService.dart';
+import 'ProductDetailPage.dart';
 
 class ProductListPage extends StatefulWidget {
   @override
@@ -9,121 +11,223 @@ class ProductListPage extends StatefulWidget {
 }
 
 class _ProductListPageState extends State<ProductListPage> {
-  late Future<List<dynamic>> _productList;
+  late Future<List<dynamic>> _favoriteProducts =
+      Future.value([]); // Default value
+  String email = '';
 
   @override
   void initState() {
     super.initState();
-    _productList = ProductService().fetchProducts(); // Fetch products when page is loaded
+    _initialize();
   }
+
+  Future<void> _initialize() async {
+    await _fetchUserEmail();
+    _fetchFavorites(); // Fetch user favorites
+  }
+
+  Future<void> _fetchUserEmail() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      setState(() {
+        email = user.email ?? '';
+      });
+      print('User email: $email');
+    } else {
+      print('No user is currently logged in.');
+    }
+  }
+
+Future<void> _fetchFavorites() async {
+  if (email.isNotEmpty) {
+    setState(() {
+      _favoriteProducts =
+          ProductService().getFavorites(email).then((favoriteIds) {
+        final uniqueIds = favoriteIds.toSet().toList();
+        print('Favorite IDs: $uniqueIds');
+
+        if (uniqueIds.isEmpty) return Future.value([]);
+
+        return ProductService()
+            .fetchProductsByIds(uniqueIds)
+            .then((products) {
+          print('Fetched products: $products');
+
+          // ตรวจสอบค่า imageUrl ใน products
+          products.forEach((product) {
+            print('Product image URL: ${product['imageUrl']}');
+          });
+
+          return products;
+        }).catchError((e) {
+          print('Error fetching products: $e');
+          return [];
+        });
+      }).catchError((e) {
+        print('Error fetching favorites: $e');
+        return [];
+      });
+    });
+  } else {
+    print('No email found, skipping fetch.');
+    setState(() {
+      _favoriteProducts = Future.value([]);
+    });
+  }
+}
+
+Widget _buildProductImage(dynamic imageUrl) {
+  if (imageUrl == null) {
+    return Container(
+      color: Colors.grey[200],
+      height: 120,
+      child: Icon(Icons.broken_image, size: 50),
+    );
+  }
+
+  try {
+    if (imageUrl is String) {
+      if (imageUrl.startsWith('data:image')) {
+        // ตรวจสอบว่าเป็น Base64 หรือไม่
+        return Image.memory(
+          base64Decode(imageUrl.split(',').last),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 120,
+        );
+      } else {
+        // ถ้าไม่ใช่ Base64 ให้โหลดจาก URL
+        return Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 120,
+        );
+      }
+    } else if (imageUrl is Map && imageUrl['data'] != null) {
+      Uint8List imageData =
+          Uint8List.fromList(List<int>.from(imageUrl['data']));
+      return Image.memory(
+        imageData,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 120,
+      );
+    } else if (imageUrl is Map && imageUrl['url'] != null) {
+      return Image.network(
+        imageUrl['url'],
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 120,
+      );
+    }
+  } catch (e) {
+    print('Error decoding image: $e');
+  }
+
+  return Container(
+    color: Colors.grey[200],
+    height: 120,
+    child: Icon(Icons.broken_image, size: 50),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Products"),
+        title: Text('รายการโปรดของคุณ'),
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: _productList,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator()); // Show loading spinner while fetching data
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error fetching products: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No products found'));
-          } else {
-            // Product data is available
-            return GridView.builder(
-              padding: EdgeInsets.all(8.0),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 columns
-                crossAxisSpacing: 10.0,
-                mainAxisSpacing: 10.0,
-                childAspectRatio: 0.75, // Control the height/width ratio
-              ),
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                var product = snapshot.data![index];
-                return GestureDetector(
-                  onTap: () {
-                    // นำไปยังหน้ารายละเอียดสินค้าเมื่อคลิกที่รายการ
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProductDetailPage(product: product),
-                      ),
-                    );
-                  },
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Image section
-                        Expanded(
-                          child: product['imageUrl'] != null &&
-                                  product['imageUrl'] is String &&
-                                  product['imageUrl'].isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-                                  child: Image.memory(
-                                    base64Decode(product['imageUrl']),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: 120,
-                                  ),
-                                )
-                              : Container(
-                                  color: Colors.grey[200],
-                                  height: 120,
-                                  child: Icon(Icons.image, size: 50),
-                                ),
-                        ),
-                        // Text section
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            product['productName'],
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            "Price: \$${product['price']}",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          child: Text(
-                            product['category'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          }
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _fetchFavorites();
         },
+        child: FutureBuilder<List<dynamic>>(
+          future: _favoriteProducts,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Center(child: Text('ไม่มีรายการโปรด'));
+            } else {
+              return GridView.builder(
+                padding: EdgeInsets.all(8.0),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10.0,
+                  mainAxisSpacing: 10.0,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final product = snapshot.data![index];
+                  final productName =
+                      product['productName']?.toString() ?? 'ไม่มีชื่อสินค้า';
+                  final price = product['price']?.toString() ?? 'ไม่มีราคา';
+                  final imageUrl = product['imageUrl'];
+
+                  return GestureDetector(
+                    onTap: () {
+                      // นำไปยังหน้ารายละเอียดสินค้าเมื่อคลิกที่รายการ
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductDetailPage(
+                            product: product,
+                            onFavoriteUpdate: (_) {
+                              // อัปเดตข้อมูลรายการโปรดใหม่เมื่อกลับมาจากหน้ารายละเอียด
+                              _fetchFavorites();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildProductImage(imageUrl),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              productName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text(
+                              "฿$price",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }
+          },
+        ),
       ),
     );
   }
