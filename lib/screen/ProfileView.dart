@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/Chat.dart';
 import 'package:loginsystem/screen/ProductDetailPage.dart';
 
 class ProfileView extends StatefulWidget {
@@ -98,60 +99,70 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildPostCard(dynamic post) {
-    print('Building Post Card: $post'); // Debug post data
-    return GestureDetector(
-      onTap: () {
-        // นำไปยังหน้า ProductDetailPage
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              product: post,
-              onFavoriteUpdate: (updatedProduct) {
-                // อัปเดตข้อมูลโพสต์ในหน้า ProfileView หากมีการเปลี่ยนแปลง
-                setState(() {
-                  final index = userPosts
-                      .indexWhere((p) => p['id'] == updatedProduct['id']);
-                  if (index != -1) {
-                    userPosts[index] = updatedProduct;
-                  }
-                });
-              },
-            ),
+Widget _buildPostCard(dynamic post) {
+  print('Building Post Card: $post'); // Debug post data
+  return GestureDetector(
+    onTap: () {
+      // นำไปยังหน้า ProductDetailPage
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductDetailPage(
+            product: post,
+            onFavoriteUpdate: (updatedProduct) {
+              // อัปเดตข้อมูลโพสต์ในหน้า ProfileView หากมีการเปลี่ยนแปลง
+              setState(() {
+                final index =
+                    userPosts.indexWhere((p) => p['id'] == updatedProduct['id']);
+                if (index != -1) {
+                  userPosts[index] = updatedProduct;
+                }
+              });
+            },
           ),
-        );
-      },
-      child: Card(
-        elevation: 5,
-        margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            post['imageUrl'] != null
-                ? Image.memory(
-                    base64Decode(post['imageUrl']),
+        ),
+      );
+    },
+    child: Card(
+      elevation: 5,
+      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          post['imageUrl'] != null && post['imageUrl'].isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                  child: Image.network(
+                    post['imageUrl'], // ใช้ URL แทน Base64
                     height: 150,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                  )
-                : Container(
-                    height: 150,
-                    color: Colors.grey[200],
-                    child: Icon(Icons.broken_image, size: 100),
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 150,
+                        color: Colors.grey[200],
+                        child: Icon(Icons.broken_image, size: 100),
+                      );
+                    },
                   ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                post['productName'] ?? 'ไม่มีชื่อสินค้า',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+                )
+              : Container(
+                  height: 150,
+                  color: Colors.grey[200],
+                  child: Icon(Icons.broken_image, size: 100),
+                ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              post['productName'] ?? 'ไม่มีชื่อสินค้า',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-              child: Text(
-                '฿${post['price']}',
-                style: TextStyle(fontSize: 16, color: Colors.pink),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+            child: Text(
+              '฿${post['price']}',
+              style: TextStyle(fontSize: 16, color: Colors.pink),
               ),
             ),
           ],
@@ -201,28 +212,28 @@ class _ProfileViewState extends State<ProfileView> {
                         ),
                 ),
                 // ปุ่มพูดคุย
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(
-                          context, '/chatpage'); // นำไปหน้า ChatPage
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: Colors.pink,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                    ),
-                    child: Text(
-                      'คุยกับคนรับหิ้ว',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 40.0),
+  child: ElevatedButton(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(
+      receiverEmail: widget.email,
+      firstName: username, // ใช้ firstName แทน receiverName
+          ),
+        ),
+      );
+    },
+    style: ElevatedButton.styleFrom(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      backgroundColor: Colors.pink,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(25),
+      ),
+    ),
+    child: Text('คุยกับผู้รับหิ้ว', style: TextStyle(fontSize: 18)),
                   ),
                 ),
               ],

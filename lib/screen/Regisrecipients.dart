@@ -15,7 +15,6 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // Text editing controllers for first form
-  final TextEditingController _accountTypeController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
@@ -26,9 +25,6 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
   final TextEditingController _bankNameController = TextEditingController();
   final TextEditingController _accountNameController = TextEditingController();
   final TextEditingController _accountNumberController = TextEditingController();
-  final TextEditingController _taxIdController = TextEditingController();
-  bool _isVATRegistered = false;
-  File? _idCardImage;
 
   bool _showSecondForm = false;
   String? _firebaseUid;
@@ -49,7 +45,6 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
 
   @override
   void dispose() {
-    _accountTypeController.dispose();
     _titleController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -58,59 +53,7 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
     _bankNameController.dispose();
     _accountNameController.dispose();
     _accountNumberController.dispose();
-    _taxIdController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final pickedImage = await ImagePicker().pickImage(source: ImageSource.camera);
-    if (pickedImage != null) {
-      setState(() {
-        _idCardImage = File(pickedImage.path);
-      });
-    }
-  }
-
-Future<String?> _resizeAndConvertImage(File imageFile) async {
-  final originalImage = img.decodeImage(await imageFile.readAsBytes());
-
-  // ย่อขนาดภาพให้กว้าง 300 พิกเซล และลดคุณภาพให้เหลือ 70%
-  final resizedImage = img.copyResize(originalImage!, width: 300);
-
-  // แปลงภาพที่ย่อขนาดแล้วเป็น Base64 ด้วยคุณภาพที่ต่ำลง
-  return base64Encode(img.encodeJpg(resizedImage, quality: 70)); // ลดคุณภาพเป็น 70%
-}
-
-
-  void _selectAccountType() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return SimpleDialog(
-          title: Text("เลือกประเภทบัญชี"),
-          children: [
-            SimpleDialogOption(
-              onPressed: () {
-                setState(() {
-                  _accountTypeController.text = 'บุคคลทั่วไป';
-                });
-                Navigator.pop(context);
-              },
-              child: Text("บุคคลทั่วไป"),
-            ),
-            SimpleDialogOption(
-              onPressed: () {
-                setState(() {
-                  _accountTypeController.text = 'นิติบุคคลภายในประเทศ';
-                });
-                Navigator.pop(context);
-              },
-              child: Text("นิติบุคคลภายในประเทศ"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _selectTitle() {
@@ -214,12 +157,11 @@ Future<String?> _resizeAndConvertImage(File imageFile) async {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_showSecondForm) {
-        // ย่อขนาดและแปลงภาพบัตรประชาชนเป็น Base64
-        final base64Image = _idCardImage != null ? await _resizeAndConvertImage(_idCardImage!) : null;
+        
+        
 
 final data = {
   "firebase_uid": _firebaseUid,
-  "accountType": _accountTypeController.text,
   "title": _titleController.text,
   "firstName": _firstNameController.text,
   "lastName": _lastNameController.text,
@@ -227,10 +169,7 @@ final data = {
   "address": _addressController.text,
   "bankName": _bankNameController.text,
   "accountName": _accountNameController.text,
-  "accountNumber": _accountNumberController.text,
-  "taxId": _taxIdController.text,
-  "idCardImage": base64Image, // ตรวจสอบให้เป็น Base64 string
-  "vatRegistered": _isVATRegistered
+  "accountNumber": _accountNumberController.text
 };print(data); // ตรวจสอบว่าข้อมูลครบถ้วนก่อนส่งออก
 
 
@@ -283,12 +222,6 @@ final data = {
                 ),
                 SizedBox(height: 16),
                 GestureDetector(
-                  onTap: _selectAccountType,
-                  child: AbsorbPointer(
-                    child: _buildInputField("ประเภทบัญชี", _accountTypeController, "กรอกประเภทบัญชี"),
-                  ),
-                ),
-                GestureDetector(
                   onTap: _selectTitle,
                   child: AbsorbPointer(
                     child: _buildInputField("คำนำหน้า", _titleController, "กรอกคำนำหน้า"),
@@ -300,7 +233,7 @@ final data = {
                 _buildInputField("ที่อยู่", _addressController, "กรอกที่อยู่", maxLines: 3),
               ] else ...[
                 Text(
-                  "ข้อมูลธนาคารและภาษี",
+                  "ข้อมูลธนาคาร",
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.pink),
                 ),
                 SizedBox(height: 16),
@@ -312,52 +245,6 @@ final data = {
                 ),
                 _buildInputField("ชื่อบัญชีธนาคาร", _accountNameController, "กรอกชื่อบัญชี"),
                 _buildInputField("หมายเลขบัญชีธนาคาร", _accountNumberController, "กรอกเลขบัญชี"),
-                _buildInputField("เลขประจำตัวผู้เสียภาษี", _taxIdController, "กรอกเลขประจำตัวผู้เสียภาษี"),
-                SizedBox(height: 20),
-                Text("บัตรประจำตัวประชาชน", style: TextStyle(fontSize: 16)),
-                SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    color: Colors.grey[200],
-                    height: 150,
-                    width: double.infinity,
-                    child: _idCardImage == null
-                        ? Center(child: Text("คลิกเพื่อถ่ายภาพบัตรประชาชน"))
-                        : Image.file(_idCardImage!, fit: BoxFit.cover),
-                  ),
-                ),
-                SizedBox(height: 20),
-                Row(
-                  children: [
-                    Text("คุณทำการจดทะเบียนภาษีหรือไม่?", style: TextStyle(fontSize: 16)),
-                    Spacer(),
-                    Row(
-                      children: [
-                        Radio(
-                          value: true,
-                          groupValue: _isVATRegistered,
-                          onChanged: (value) {
-                            setState(() {
-                              _isVATRegistered = value as bool;
-                            });
-                          },
-                        ),
-                        Text("ใช่"),
-                        Radio(
-                          value: false,
-                          groupValue: _isVATRegistered,
-                          onChanged: (value) {
-                            setState(() {
-                              _isVATRegistered = value as bool;
-                            });
-                          },
-                        ),
-                        Text("ไม่"),
-                      ],
-                    ),
-                  ],
-                ),
               ],
               SizedBox(height: 20),
               ElevatedButton(

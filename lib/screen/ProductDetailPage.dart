@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:loginsystem/screen/ProfileView.dart';
-import 'PostService.dart';
+import 'package:loginsystem/screen/Shopping.dart';
+import 'package:loginsystem/screen/PostService.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -20,19 +22,37 @@ class ProductDetailPage extends StatefulWidget {
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
+  String? updatedImagePath; // ใช้เก็บ path ของภาพที่เลือก
   late Map<String, dynamic> product;
   bool isFavorite = false;
   String email = ''; // Will fetch from Firebase Authentication
-  final String baseUrl = 'http://10.0.2.2:3000'; // API Base URL
+  final String baseUrl = 'http://10.0.2.2:3000';
 
-  @override
-  void initState() {
-    super.initState();
-    product = widget.product;
-    isFavorite = product['isFavorite'] ?? false;
-    _fetchEmail();
-    _checkFavoriteStatus();
+  String? get imageUrl => null; // API Base URL
+@override
+void initState() {
+  super.initState();
+  product = widget.product;
+  _fetchProductDetails(); // เรียก API เพื่อดึงข้อมูลล่าสุด
+  isFavorite = product['isFavorite'] ?? false;
+  _fetchEmail();
+  _checkFavoriteStatus();
+}
+
+Future<void> _fetchProductDetails() async {
+  final response = await http.get(Uri.parse('$baseUrl/product/${product['id']}'));
+  
+  if (response.statusCode == 200) {
+    final updatedProduct = json.decode(response.body);
+    setState(() {
+      product = updatedProduct; // อัปเดต product ด้วยข้อมูลใหม่
+      print('Updated product: $product'); // Debug ดูค่าของ product
+    });
+  } else {
+    print('Failed to fetch product details: ${response.body}');
   }
+}
+
 
   Future<void> _fetchEmail() async {
     final User? user = FirebaseAuth.instance.currentUser;
@@ -71,25 +91,26 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       throw Exception('Error toggling favorite status');
     }
   }
-Future<void> _checkFavoriteStatus() async {
-  try {
-    final response = await http.get(
-      Uri.parse('http://10.0.2.2:3000/favorites?email=$email'),
-    );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      setState(() {
-        // ตรวจสอบว่ารายการสินค้านี้อยู่ในรายการโปรดหรือไม่
-        isFavorite = data.any((fav) => fav['product_id'] == product['id']);
-      });
-    } else {
-      print('Failed to fetch favorite status: ${response.body}');
+  Future<void> _checkFavoriteStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/favorites?email=$email'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          // ตรวจสอบว่ารายการสินค้านี้อยู่ในรายการโปรดหรือไม่
+          isFavorite = data.any((fav) => fav['product_id'] == product['id']);
+        });
+      } else {
+        print('Failed to fetch favorite status: ${response.body}');
+      }
+    } catch (e) {
+      print('Error fetching favorite status: $e');
     }
-  } catch (e) {
-    print('Error fetching favorite status: $e');
   }
-}
 
   Future<bool> _canEditOrDelete(String email, int productId) async {
     final String apiUrl = '$baseUrl/checkRoleAndOwnership';
@@ -157,16 +178,15 @@ Future<void> _checkFavoriteStatus() async {
           children: [
             Row(
               children: [
-                // Profile Picture - ทำให้กดแล้ว navigate ไปหน้า ProfileView
+                // Profile Picture
                 GestureDetector(
                   onTap: () {
-Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => ProfileView(email: product['email'] ?? ''),
-  ),
-);
-
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileView(email: product['email'] ?? ''),
+                      ),
+                    );
                   },
                   child: CircleAvatar(
                     backgroundImage: product['profilePicture'] != null &&
@@ -177,14 +197,12 @@ Navigator.push(
                   ),
                 ),
                 SizedBox(width: 8),
-                // User Name - ทำให้กดแล้ว navigate ไปหน้า ProfileView
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            ProfileView(email: product['email']),
+                        builder: (context) => ProfileView(email: product['email'] ?? ''),
                       ),
                     );
                   },
@@ -195,14 +213,11 @@ Navigator.push(
                 ),
               ],
             ),
-
             SizedBox(height: 20),
             _buildProductImage(product['imageUrl']),
             SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Text(
@@ -229,7 +244,6 @@ Navigator.push(
 
                       widget.onFavoriteUpdate(product);
                     } catch (e) {
-                      // Revert UI state if the operation fails
                       setState(() {
                         isFavorite = !isFavorite;
                       });
@@ -248,11 +262,6 @@ Navigator.push(
               style: TextStyle(fontSize: 18, color: Colors.pink),
             ),
             SizedBox(height: 10),
-            // Icon(
-            //   Icons.shopping_bag_outlined, // ใช้ไอคอนกระเป๋าช้อปปิ้ง
-            //   size: 30, // ขนาดของไอคอน
-            //   color: Colors.grey, // สีของไอคอน
-            // ),
             Text(
               product['category'] ?? '',
               style: TextStyle(fontSize: 18, color: Colors.grey[600]),
@@ -262,11 +271,49 @@ Navigator.push(
               "รายละเอียด " ?? '',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            Text(
-              product['productDescription'] ?? '',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-            ),
+            SizedBox(height: 10),
+Text(
+  product['productDescription'] ?? 'ไม่มีรายละเอียดสินค้า', // หากไม่มีค่าให้แสดงข้อความเริ่มต้น
+  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+),
+
+Text(
+  "ค่าขนส่ง: ฿${double.tryParse(product['shipping']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
+  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+),
+SizedBox(height: 10),
+Text(
+  "ค่าบริการเพิ่มเติม: ฿${double.tryParse(product['carry']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
+  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+),
+
+
           ],
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            backgroundColor: Colors.pink,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => OrderPage(
+                    productId: product['id']), // ส่ง productId เท่านั้น
+              ),
+            );
+          },
+          child: Text(
+            'สั่งซื้อสินค้า',
+            style: TextStyle(fontSize: 18, color: Colors.white),
+          ),
         ),
       ),
     );
@@ -283,15 +330,14 @@ Navigator.push(
     }
 
     try {
-      final imageData = base64Decode(imageUrl);
-      return Image.memory(
-        imageData,
+      return Image.network(
+        imageUrl,
         fit: BoxFit.cover,
         height: 300,
         width: double.infinity,
       );
     } catch (e) {
-      print('Error decoding image: $e');
+      print('Error loading image from URL: $e');
       return Container(
         color: Colors.grey[200],
         height: 300,
@@ -302,13 +348,14 @@ Navigator.push(
   }
 
   // Helper function to pick an image and return it as Base64
-  Future<String?> _pickImage() async {
+  Future<void> _pickImage() async {
     try {
       final pickedFile =
           await ImagePicker().pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
-        final bytes = await pickedFile.readAsBytes();
-        return "data:image/png;base64,${base64Encode(bytes)}";
+        setState(() {
+          var updatedImagePath = pickedFile.path; // บันทึก path ของรูปที่เลือก
+        });
       }
     } catch (e) {
       print('Error picking image: $e');
@@ -326,6 +373,10 @@ Navigator.push(
         TextEditingController(text: product['price'].toString());
     String? selectedCategory = product['category'];
     String? updatedImageBase64;
+final TextEditingController shippingController =
+    TextEditingController(text: product['shipping']?.toString() ?? '0.00');
+final TextEditingController carryController =
+    TextEditingController(text: product['carry']?.toString() ?? '0.00');
 
     showDialog(
       context: context,
@@ -350,6 +401,26 @@ Navigator.push(
                   decoration: InputDecoration(labelText: 'ราคา'),
                   keyboardType: TextInputType.number,
                 ),
+TextField(
+  controller: shippingController,
+  decoration: InputDecoration(labelText: 'ค่าขนส่ง (Shipping)'),
+  keyboardType: TextInputType.numberWithOptions(decimal: true),
+  onChanged: (value) {
+    product['shipping'] = double.tryParse(value) ?? 0.0;
+  },
+),
+TextField(
+  controller: carryController,
+  decoration: InputDecoration(labelText: 'ค่าบริการเพิ่มเติม (Carry)'),
+  keyboardType: TextInputType.numberWithOptions(decimal: true),
+  onChanged: (value) {
+    product['carry'] = double.tryParse(value) ?? 0.0;
+  },
+),
+
+
+
+
                 DropdownButtonFormField<String>(
                   value: selectedCategory,
                   items: [
@@ -367,24 +438,25 @@ Navigator.push(
                 Text('รูปภาพสินค้า'),
                 GestureDetector(
                   onTap: () async {
-                    final pickedImage = await _pickImage();
-                    if (pickedImage != null) {
+                    final pickedFile = await ImagePicker()
+                        .pickImage(source: ImageSource.gallery);
+                    if (pickedFile != null) {
                       setState(() {
-                        updatedImageBase64 = pickedImage;
+                        updatedImagePath =
+                            pickedFile.path; // บันทึก path ของรูปที่เลือก
                       });
                     }
                   },
                   child: Container(
                     height: 120,
-                    child: updatedImageBase64 != null
-                        ? Image.memory(
-                            base64Decode(updatedImageBase64!.split(',').last),
+                    child: updatedImagePath != null
+                        ? Image.file(
+                            File(updatedImagePath!), // แสดงภาพใหม่ที่เลือก
                             fit: BoxFit.cover,
                           )
                         : (product['imageUrl'] != null
-                            ? Image.memory(
-                                base64Decode(
-                                    product['imageUrl'].split(',').last),
+                            ? Image.network(
+                                product['imageUrl'], // แสดงภาพเดิมจาก backend
                                 fit: BoxFit.cover,
                               )
                             : Icon(Icons.add_photo_alternate_outlined,
@@ -402,15 +474,29 @@ Navigator.push(
             ElevatedButton(
               onPressed: () async {
                 try {
-                  await PostService().editPost(
-                    product['id'],
-                    productName: productNameController.text,
-                    productDescription: productDescriptionController.text,
-                    price: double.tryParse(priceController.text) ??
-                        product['price'],
-                    category: selectedCategory!,
-                    imageUrl: updatedImageBase64 ?? product['imageUrl'],
-                  );
+await PostService().editPost(
+  product['id'],
+  productName: productNameController.text,
+  productDescription: productDescriptionController.text,
+  price: double.tryParse(priceController.text) ?? product['price'],
+  shipping: double.tryParse(shippingController.text) ?? product['shipping'],
+  carry: double.tryParse(carryController.text) ?? product['carry'],
+  category: selectedCategory!,
+  imagePath: updatedImagePath ?? product['imageUrl'],
+);
+
+@override
+void dispose() {
+  productNameController.dispose();
+  productDescriptionController.dispose();
+  priceController.dispose();
+  shippingController.dispose();
+  carryController.dispose();
+  super.dispose();
+}
+
+// โหลดข้อมูลใหม่จาก Backend
+await _fetchProductDetails();
                   setState(() {
                     product['productName'] = productNameController.text;
                     product['productDescription'] =
@@ -418,8 +504,11 @@ Navigator.push(
                     product['price'] = double.tryParse(priceController.text) ??
                         product['price'];
                     product['category'] = selectedCategory;
+                    product['imageUrl'] =
+                        updatedImagePath ?? product['imageUrl'];
                   });
-                  Navigator.of(context).pop();
+                  Navigator.of(context).pop(); // ปิด Dialog
+                  Navigator.pop(context, true); // ส่งค่าสถานะกลับ
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('แก้ไขสำเร็จ!')),
                   );
@@ -430,7 +519,7 @@ Navigator.push(
                 }
               },
               child: Text('บันทึก'),
-            ),
+            )
           ],
         );
       },
@@ -451,18 +540,18 @@ Navigator.push(
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  await PostService().deletePost(product['id']);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ลบสินค้าสำเร็จ!')),
-                  );
-                  Navigator.pop(context);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ไม่สามารถลบสินค้าได้: $e')),
-                  );
-                }
+                Navigator.of(context).pop(); // ปิด Dialog
+try {
+  await PostService().deletePost(product['id']);
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('ลบสินค้าสำเร็จ!')),
+  );
+  Navigator.pop(context, true); // ส่งค่าสถานะกลับไปยังหน้าก่อนหน้า
+} catch (e) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('ไม่สามารถลบสินค้าได้: $e')),
+  );
+}
               },
               child: Text('ลบ'),
             ),

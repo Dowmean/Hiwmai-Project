@@ -1,16 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'ProductCategory.dart'; // Import for the category page
 import 'ProductDetailPage.dart'; // Import for the product detail page
-
+import 'ChatList.dart';
 
 class HomepageScreen extends StatefulWidget {
   @override
   _HomepageScreenState createState() => _HomepageScreenState();
 }
-
 
 class _HomepageScreenState extends State<HomepageScreen> {
   List<dynamic> recommendedProducts = [];
@@ -18,20 +19,16 @@ class _HomepageScreenState extends State<HomepageScreen> {
   int _currentPage = 0;
   Timer? _carouselTimer;
 
-
   bool isLoading = true; // Flag for loading products
-
 
   // API URL for fetching products
   final String apiUrl = 'http://10.0.2.2:3000/getproduct';
-
 
   // List of carousel images
   final List<String> carouselImages = [
     'assets/images/carousel1.png',
     'assets/images/carousel2.png',
   ];
-
 
   @override
   void initState() {
@@ -40,14 +37,12 @@ class _HomepageScreenState extends State<HomepageScreen> {
     fetchProducts(); // Fetch recommended products
   }
 
-
   @override
   void dispose() {
     _pageController.dispose();
     _carouselTimer?.cancel();
     super.dispose();
   }
-
 
   // Function to auto-slide the carousel
   void _startAutoSlide() {
@@ -65,14 +60,12 @@ class _HomepageScreenState extends State<HomepageScreen> {
     });
   }
 
-
   // Function to fetch products
   Future<void> fetchProducts() async {
     try {
       final response = await http.get(Uri.parse(apiUrl));
       print("API Status Code: ${response.statusCode}");
       print("API Response Body: ${response.body}");
-
 
       if (response.statusCode == 200) {
         List<dynamic> products = json.decode(response.body);
@@ -94,7 +87,6 @@ class _HomepageScreenState extends State<HomepageScreen> {
     }
   }
 
-
   // Navigate to category page
   void _navigateToCategoryPage(String category) {
     Navigator.push(
@@ -104,7 +96,6 @@ class _HomepageScreenState extends State<HomepageScreen> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +120,12 @@ class _HomepageScreenState extends State<HomepageScreen> {
           IconButton(
             icon: Icon(Icons.chat_bubble),
             onPressed: () {
-              // Placeholder for chat functionality
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatListPage(),
+                ),
+              );
             },
           ),
         ],
@@ -246,67 +242,88 @@ class _HomepageScreenState extends State<HomepageScreen> {
                                     children: [
                                       // Profile Section
                                       Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Row(
-                                          children: [
-                                            // Profile picture
-                                            product['profile_picture'] !=
-                                                        null &&
-                                                    product['profile_picture']
-                                                        .isNotEmpty
-                                                ? CircleAvatar(
-                                                    backgroundImage: MemoryImage(
-                                                      base64Decode(product[
-                                                          'profile_picture']),
-                                                    ),
-                                                    radius: 16,
-                                                  )
-                                                : CircleAvatar(
-                                                    child: Icon(Icons.person),
-                                                    radius: 16,
-                                                  ),
-                                            SizedBox(width: 8),
-                                            // First name
-                                            product['first_name'] != null &&
-                                                    product['first_name']
-                                                        .isNotEmpty
-                                                ? Text(
-                                                    product['first_name'],
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                    ),
-                                                  )
-                                                : Text(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Row(
+                                            children: [
+                                              CircleAvatar(
+                                                backgroundImage: product[
+                                                            'profilePicture'] !=
+                                                        null
+                                                    ? MemoryImage(base64Decode(
+                                                        product[
+                                                            'profilePicture']))
+                                                    : null,
+                                                child:
+                                                    product['profilePicture'] ==
+                                                            null
+                                                        ? Icon(Icons.person)
+                                                        : null,
+                                                radius: 16,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                product['firstName'] ??
                                                     "Unknown",
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                    ),
-                                                  ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Product Image Section
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          )),
                                       Expanded(
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.vertical(
                                               top: Radius.circular(10)),
                                           child: product['imageUrl'] != null
-                                              ? Image.memory(
-                                                  base64Decode(
-                                                      product['imageUrl']),
-                                                  fit: BoxFit.cover,
-                                                  width: double.infinity,
-                                                )
+                                              ? (product['imageUrl'] is Map &&
+                                                      product['imageUrl']
+                                                              ['data'] !=
+                                                          null
+                                                  ? Image.memory(
+                                                      Uint8List.fromList(List<
+                                                              int>.from(
+                                                          product['imageUrl']
+                                                              ['data'])),
+                                                      fit: BoxFit.cover,
+                                                      width: double.infinity,
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
+                                                        return Container(
+                                                          color:
+                                                              Colors.grey[200],
+                                                          child: Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                              size: 50),
+                                                        );
+                                                      },
+                                                    )
+                                                  : Image.network(
+                                                      product[
+                                                          'imageUrl'], // กรณี imageUrl เป็น string URL
+                                                      fit: BoxFit.cover,
+                                                      width: double.infinity,
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
+                                                        return Container(
+                                                          color:
+                                                              Colors.grey[200],
+                                                          child: Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                              size: 50),
+                                                        );
+                                                      },
+                                                    ))
                                               : Container(
                                                   color: Colors.grey[200],
-                                                  child: Icon(Icons.image),
+                                                  child: Icon(Icons.image,
+                                                      size: 50),
                                                 ),
                                         ),
                                       ),
+
                                       Padding(
                                         padding: const EdgeInsets.all(8.0),
                                         child: Text(
@@ -347,7 +364,6 @@ class _HomepageScreenState extends State<HomepageScreen> {
     );
   }
 
-
   // Build category icon
   Widget _buildCategoryIcon(IconData icon, String label) {
     return GestureDetector(
@@ -368,6 +384,3 @@ class _HomepageScreenState extends State<HomepageScreen> {
     );
   }
 }
-
-
-

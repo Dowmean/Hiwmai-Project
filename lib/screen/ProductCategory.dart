@@ -145,8 +145,8 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.vertical(
                                           top: Radius.circular(10)),
-                                      child: Image.memory(
-                                        base64Decode(product['imageUrl']),
+                                      child: Image.network(
+                                        product['imageUrl'], // ใช้ URL
                                         fit: BoxFit.cover,
                                         width: double.infinity,
                                       ),

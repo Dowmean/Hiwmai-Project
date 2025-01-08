@@ -19,6 +19,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
   final TextEditingController _priceController = TextEditingController();
   String? _selectedCategory;
   File? _selectedImageFile;
+final TextEditingController _shippingController = TextEditingController();
+final TextEditingController _carryController = TextEditingController();
 
   List<DropdownMenuItem<String>> get _categoryItems {
     return [
@@ -75,66 +77,77 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
-  Future<void> _submitPost() async {
-    if (_selectedCategory == null ||
-        _productNameController.text.isEmpty ||
-        _priceController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
-      );
+Future<void> _submitPost() async {
+  if (_selectedCategory == null ||
+      _productNameController.text.isEmpty ||
+      _priceController.text.isEmpty ||
+      _shippingController.text.isEmpty || // ตรวจสอบ shipping
+      _carryController.text.isEmpty // ตรวจสอบ carry
+      ) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
+    );
+    return;
+  }
+
+  try {
+    // ดึง firebase_uid ของผู้ใช้ปัจจุบัน
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('User not logged in');
       return;
     }
+    final String firebaseUid = user.uid;
 
-    try {
-      // ดึง firebase_uid ของผู้ใช้ปัจจุบัน
-      final User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        print('User not logged in');
-        return;
-      }
-      final String firebaseUid = user.uid;
-
-      String? base64Image;
-      if (_selectedImageFile != null) {
-        base64Image = base64Encode(await _selectedImageFile!.readAsBytes());
-      }
-
-      // Log ข้อมูลที่กำลังส่ง
-      print("Submitting data:");
-      print("FirebaseUid: $firebaseUid");
-      print("Category: $_selectedCategory");
-      print("ProductName: ${_productNameController.text}");
-      print("ProductDescription: ${_productDescriptionController.text}");
-      print("Price: ${_priceController.text}");
-      print("ImageFile: $base64Image");
-
-      await PostService().createPost(
-        firebaseUid: firebaseUid, // ส่ง firebase_uid
-        category: _selectedCategory!,
-        productName: _productNameController.text,
-        productDescription: _productDescriptionController.text,
-        price: double.parse(_priceController.text),
-        imageFile: base64Image, // ส่ง Base64 ของรูปภาพ
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('สร้างโพสต์สำเร็จ!')),
-      );
-
-      setState(() {
-        _productNameController.clear();
-        _productDescriptionController.clear();
-        _priceController.clear();
-        _selectedCategory = null;
-        _selectedImageFile = null;
-      });
-    } catch (e) {
-      print('Error while creating post: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้างโพสต์: $e')),
-      );
+    String? base64Image;
+    if (_selectedImageFile != null) {
+      base64Image = base64Encode(await _selectedImageFile!.readAsBytes());
     }
+
+    // Log ข้อมูลที่กำลังส่ง
+    print("Submitting data:");
+    print("FirebaseUid: $firebaseUid");
+    print("Category: $_selectedCategory");
+    print("ProductName: ${_productNameController.text}");
+    print("ProductDescription: ${_productDescriptionController.text}");
+    print("Price: ${_priceController.text}");
+    print("Shipping: ${_shippingController.text}");
+    print("Carry: ${_carryController.text}");
+    print("ImageFile: $base64Image");
+
+    // ส่งข้อมูลไปยัง PostService
+    await PostService().createPost(
+      firebaseUid: firebaseUid, // ส่ง firebase_uid
+      category: _selectedCategory!,
+      productName: _productNameController.text,
+      productDescription: _productDescriptionController.text,
+      price: double.parse(_priceController.text),
+      shipping: double.parse(_shippingController.text), // ส่ง shipping
+      carry: double.parse(_carryController.text), // ส่ง carry
+      imageFile: base64Image, // ส่ง Base64 ของรูปภาพ
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('สร้างโพสต์สำเร็จ!')),
+    );
+
+    setState(() {
+      _productNameController.clear();
+      _productDescriptionController.clear();
+      _priceController.clear();
+      _shippingController.clear();
+      _carryController.clear();
+      _selectedCategory = null;
+      _selectedImageFile = null;
+    });
+  } catch (e) {
+    print('Error while creating post: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้างโพสต์: $e')),
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +216,19 @@ class _PostCreatePageState extends State<PostCreatePage> {
                 decoration: InputDecoration(labelText: 'ราคา'),
                 keyboardType: TextInputType.number,
               ),
+              SizedBox(height: 20),
+TextFormField(
+  controller: _shippingController,
+  decoration: InputDecoration(labelText: 'ค่าขนส่ง (Shipping)'),
+  keyboardType: TextInputType.number,
+),
+SizedBox(height: 20),
+TextFormField(
+  controller: _carryController,
+  decoration: InputDecoration(labelText: 'ค่าบริการเพิ่มเติม (Carry)'),
+  keyboardType: TextInputType.number,
+),
+
               SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _selectedCategory,

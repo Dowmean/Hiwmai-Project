@@ -98,24 +98,26 @@ class ProductService {
   }
 
   /// **ดึงข้อมูลสินค้าด้วย IDs**
-  Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
-    print('Fetching products for IDs: $productIds');
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/getproduct/fetchByIds'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'product_ids': productIds}),
-      );
+Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
+  print('Fetching products for IDs: $productIds');
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/getproduct/fetchByIds'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'product_ids': productIds}),
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to fetch products: ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching products: $e');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // ใช้ข้อมูล imageUrl จาก Backend โดยตรง
+      return data;
+    } else {
+      throw Exception('Failed to fetch products: ${response.body}');
     }
+  } catch (e) {
+    throw Exception('Error fetching products: $e');
   }
+}
 
   /// **ลบสินค้า**
   Future<bool> deleteProduct(String productId) async {
@@ -133,42 +135,43 @@ class ProductService {
   }
 
   /// **แก้ไขสินค้า**
-  Future<bool> editProduct(
-    String productId, {
-    required String productName,
-    required String productDescription,
-    required double price,
-    required String category,
-    String? imageBase64, // Optional Base64 string for the image
-  }) async {
-    final editUrl = '$baseUrl/editProduct/$productId';
-    try {
-      final requestPayload = {
-        "productName": productName,
-        "productDescription": productDescription,
-        "price": price,
-        "category": category,
-      };
+Future<bool> editProduct(
+  String productId, {
+  required String productName,
+  required String productDescription,
+  required double price,
+  required String category,
+  String? imagePath, // Path ของรูปภาพที่ใช้ใน server
+}) async {
+  final editUrl = '$baseUrl/editProduct/$productId';
+  try {
+    final requestPayload = {
+      "productName": productName,
+      "productDescription": productDescription,
+      "price": price,
+      "category": category,
+    };
 
-      if (imageBase64 != null && imageBase64.isNotEmpty) {
-        requestPayload["imageUrl"] = imageBase64;
-      }
-
-      final response = await http.put(
-        Uri.parse(editUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(requestPayload),
-      );
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        throw Exception('Failed to edit product: ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Error editing product: $e');
+    if (imagePath != null && imagePath.isNotEmpty) {
+      requestPayload["imageUrl"] = imagePath; // ใช้ path แทน base64
     }
+
+    final response = await http.put(
+      Uri.parse(editUrl),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(requestPayload),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      throw Exception('Failed to edit product: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Error editing product: $e');
   }
+}
+
 
   /// **ฟังก์ชัน Utility สำหรับ parse product ID**
   int _parseProductId(dynamic productId) {

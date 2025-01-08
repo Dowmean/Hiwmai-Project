@@ -77,7 +77,7 @@ Future<void> _fetchFavorites() async {
 }
 
 Widget _buildProductImage(dynamic imageUrl) {
-  if (imageUrl == null) {
+  if (imageUrl == null || imageUrl.isEmpty) {
     return Container(
       color: Colors.grey[200],
       height: 120,
@@ -86,52 +86,28 @@ Widget _buildProductImage(dynamic imageUrl) {
   }
 
   try {
-    if (imageUrl is String) {
-      if (imageUrl.startsWith('data:image')) {
-        // ตรวจสอบว่าเป็น Base64 หรือไม่
-        return Image.memory(
-          base64Decode(imageUrl.split(',').last),
-          fit: BoxFit.cover,
-          width: double.infinity,
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 120,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: Colors.grey[200],
           height: 120,
+          child: Icon(Icons.broken_image, size: 50),
         );
-      } else {
-        // ถ้าไม่ใช่ Base64 ให้โหลดจาก URL
-        return Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: 120,
-        );
-      }
-    } else if (imageUrl is Map && imageUrl['data'] != null) {
-      Uint8List imageData =
-          Uint8List.fromList(List<int>.from(imageUrl['data']));
-      return Image.memory(
-        imageData,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: 120,
-      );
-    } else if (imageUrl is Map && imageUrl['url'] != null) {
-      return Image.network(
-        imageUrl['url'],
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: 120,
-      );
-    }
+      },
+    );
   } catch (e) {
-    print('Error decoding image: $e');
+    print('Error loading image: $e');
+    return Container(
+      color: Colors.grey[200],
+      height: 120,
+      child: Icon(Icons.broken_image, size: 50),
+    );
   }
-
-  return Container(
-    color: Colors.grey[200],
-    height: 120,
-    child: Icon(Icons.broken_image, size: 50),
-  );
 }
-
 
   @override
   Widget build(BuildContext context) {

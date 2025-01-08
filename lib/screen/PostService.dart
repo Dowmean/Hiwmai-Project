@@ -2,18 +2,20 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class PostService {
-  final String baseUrl = 'http://10.0.2.2:3000';
+  final String baseUrl = 'http://10.0.2.2:3000'; 
   final String apiUrl = 'http://10.0.2.2:3000/checkRoleAndOwnership';
   
 
 
   // Function to create a new post
-  Future<void> createPost({
+Future<void> createPost({
     required String firebaseUid,
     required String category,
     required String productName,
     required String productDescription,
     required double price,
+    required double shipping, // เพิ่มฟิลด์ shipping
+    required double carry, // เพิ่มฟิลด์ carry
     String? imageFile, // Base64-encoded image
   }) async {
     final String apiUrl = '$baseUrl/createpost'; // Full API URL
@@ -25,6 +27,8 @@ class PostService {
       'productName': productName,
       'productDescription': productDescription,
       'price': price,
+      'shipping': shipping, // ส่งค่า shipping
+      'carry': carry, // ส่งค่า carry
       'imageUrl': imageFile, // Can be null if no image
     };
 
@@ -49,76 +53,72 @@ class PostService {
   }
 
 
+  deletePost(product) {}
+
+  editPost(product, {required String productName, required String productDescription, required price, required shipping, required carry, required String category, required imagePath}) {}
+}
+
+
   // ฟังก์ชันสำหรับแก้ไขโพสต์
-  Future<void> editPost(
-    int id, {
-    required String productName,
-    required String productDescription,
-    required double price,
-    required String category,
-    String? imageUrl,
-  }) async {
-    // ข้อมูลของโพสต์ที่จะส่ง
-    Map<String, dynamic> postData = {
-      'productName': productName,
-      'productDescription': productDescription,
-      'price': price,
-      'category': category,
-      'imageUrl': imageUrl ?? '',
-    };
+Future<void> editPost(
+  int id, {
+  required String productName,
+  required String productDescription,
+  required double price,
+  required double shipping,
+  required double carry,
+  required String category,
+  required String? imagePath,
+}) async {
+  Map<String, dynamic> postData = {
+    'productName': productName,
+    'productDescription': productDescription,
+    'price': price,
+    'shipping': shipping,
+    'carry': carry,
+    'category': category,
+    'imageUrl': imagePath ?? '',
+  };
 
-    // ส่งคำขอ PUT ไปยัง backend เพื่อแก้ไขโพสต์
-    try {
-      var response = await http.put(
-        Uri.parse('http://10.0.2.2:3000/editpost/$id'),
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(postData),
-      );
-
-      if (response.statusCode == 200) {
-        print("Post updated successfully");
-      } else {
-        print("Failed to update post: ${response.body}");
-      }
-    } catch (e) {
-      print("Error updating post: $e");
-    }
-  }
-
-  // ฟังก์ชันสำหรับลบโพสต์
-  Future<void> deletePost(int id) async {
-    // ส่งคำขอ DELETE ไปยัง backend เพื่อทำการลบโพสต์
-    try {
-      var response = await http.delete(
-        Uri.parse('http://10.0.2.2:3000/deletepost/$id'),
-      );
-
-      if (response.statusCode == 200) {
-        print("Post deleted successfully");
-      } else {
-        print("Failed to delete post: ${response.body}");
-      }
-    } catch (e) {
-      print("Error deleting post: $e");
-    }
-  }
-
-Future<List<int>> getFavorites(String email) async {
-  final url = Uri.parse('http://10.0.2.2:3000/favorites?email=$email'); // เปลี่ยน URL
   try {
-    final response = await http.get(url);
+    var baseUrl;
+    var response = await http.put(
+      Uri.parse('$baseUrl/editpost/$id'),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(postData),
+    );
+
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map<int>((item) => item['product_id'] as int).toList();
+      print("Post updated successfully: ${response.body}");
     } else {
-      print('Failed to fetch favorites: ${response.body}');
-      throw Exception('Failed to fetch favorites');
+      print("Failed to update post: ${response.statusCode}, ${response.body}");
     }
   } catch (e) {
-    print('Error fetching favorites: $e');
-    throw Exception('Error fetching favorites: $e');
+    print("Error updating post: $e");
   }
 }
+
+
+
+
+  // ฟังก์ชันสำหรับลบโพสต์
+Future<void> deletePost(int id) async {
+  try {
+    var baseUrl;
+    var response = await http.delete(
+      Uri.parse('$baseUrl/deletepost/$id'),
+    );
+
+    if (response.statusCode == 200) {
+      print("Post deleted successfully: ${response.body}");
+    } else {
+      print("Failed to delete post: ${response.statusCode}, ${response.body}");
+    }
+  } catch (e) {
+    print("Error deleting post: $e");
+  }
+}
+
 
 Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
   final url = Uri.parse('http://10.0.2.2:3000/getproduct/fetchByIds');
@@ -143,9 +143,4 @@ Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
     throw Exception('Error fetching products: $e');
   }
 }
-
-
-
-
   toggleFavoriteStatus({required String userId, required String productId, required bool isFavorite}) {}
-}

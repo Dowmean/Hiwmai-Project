@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/Chat.dart';
 
 class RequirementPage extends StatefulWidget {
   @override
@@ -77,7 +78,7 @@ Future<void> updateRole(String email) async {
 }
 
 
-Future<void> deleteUser(String email) async {
+Future<void> deleteUser(String email, String firstName) async {
   final url = 'http://10.0.2.2:3000/deleteRecipient'; // URL ของ API
   try {
     final response = await http.delete(
@@ -87,14 +88,23 @@ Future<void> deleteUser(String email) async {
     );
 
     if (response.statusCode == 200) {
-      // เคลียร์ข้อมูลใน users list เมื่อการลบสำเร็จ
       setState(() {
-        // Remove user from list after deletion
-        users.removeWhere((user) => user['email'] == email);
+        users.removeWhere((user) => user['email'] == email); // ลบข้อมูลจาก List
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ลบผู้ใช้ $email สำเร็จ')),
+        SnackBar(content: Text('ลบข้อมูลนักหิ้ว $email สำเร็จ')),
+      );
+
+      // Navigate to ChatPage
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(
+            receiverEmail: email,
+            firstName: firstName, // ส่ง firstName ไปยัง ChatPage
+          ),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -160,13 +170,14 @@ Future<void> deleteUser(String email) async {
                           child: Text('ยืนยัน'),
                         ),
                         SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () => deleteUser(user['email']),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red, // Text color for delete
-                          ),
-                          child: Text('ลบ'),
-                        ),
+OutlinedButton(
+  onPressed: () => deleteUser(user['email'], user['first_name'] ?? 'ไม่ทราบชื่อ'),
+  style: OutlinedButton.styleFrom(
+    foregroundColor: Colors.red,
+  ),
+  child: Text('ลบ'),
+),
+
                       ],
                     ),
                   ],

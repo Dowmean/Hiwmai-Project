@@ -273,11 +273,22 @@ class ProductCard extends StatelessWidget {
           if (post.imageUrl != null && post.imageUrl!.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.memory(
-                base64Decode(post.imageUrl!),
+              child: Image.network(
+                post.imageUrl!,
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                  );
+                },
               ),
             )
           else
