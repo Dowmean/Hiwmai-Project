@@ -40,18 +40,27 @@ void initState() {
 }
 
 Future<void> _fetchProductDetails() async {
-  final response = await http.get(Uri.parse('$baseUrl/product/${product['id']}'));
-  
-  if (response.statusCode == 200) {
-    final updatedProduct = json.decode(response.body);
-    setState(() {
-      product = updatedProduct; // อัปเดต product ด้วยข้อมูลใหม่
-      print('Updated product: $product'); // Debug ดูค่าของ product
-    });
-  } else {
-    print('Failed to fetch product details: ${response.body}');
+  try {
+    final response = await http.get(Uri.parse('$baseUrl/product/${product['id']}'));
+
+    if (response.statusCode == 200) {
+      final updatedProduct = json.decode(response.body);
+
+      setState(() {
+        product = {
+          ...updatedProduct,
+          'profilePicture': updatedProduct['profilePicture'] ??
+              'assets/avatar.png', // กำหนดค่าเริ่มต้นสำหรับ profilePicture
+        };
+      });
+    } else {
+      print('Failed to fetch product details: ${response.body}');
+    }
+  } catch (e) {
+    print('Error fetching product details: $e');
   }
 }
+
 
 
   Future<void> _fetchEmail() async {
@@ -189,12 +198,15 @@ Future<void> _fetchProductDetails() async {
                     );
                   },
                   child: CircleAvatar(
-                    backgroundImage: product['profilePicture'] != null &&
-                            product['profilePicture'].isNotEmpty
-                        ? MemoryImage(base64Decode(product['profilePicture']))
-                        : AssetImage('assets/avatar.png') as ImageProvider,
-                    radius: 24,
-                  ),
+  backgroundImage: product['profilePicture'] != null &&
+          product['profilePicture'].isNotEmpty
+      ? (product['profilePicture'].startsWith('http')
+          ? NetworkImage(product['profilePicture'])
+          : MemoryImage(base64Decode(product['profilePicture'])))
+      : AssetImage('assets/avatar.png') as ImageProvider,
+  radius: 24,
+)
+,
                 ),
                 SizedBox(width: 8),
                 GestureDetector(
@@ -319,33 +331,50 @@ Text(
     );
   }
 
-  Widget _buildProductImage(String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return Container(
-        color: Colors.grey[200],
-        height: 300,
-        width: double.infinity,
-        child: Icon(Icons.broken_image, size: 100),
-      );
-    }
+Widget _buildProductImage(String? imageUrl) {
+  if (imageUrl == null || imageUrl.isEmpty) {
+    return Container(
+      color: Colors.grey[200],
+      height: 300,
+      width: double.infinity,
+      child: Icon(Icons.broken_image, size: 100),
+    );
+  }
 
-    try {
+  try {
+    if (imageUrl.startsWith('http')) {
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
         height: 300,
         width: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+  return Container(
+    color: Colors.grey[200],
+    child: Icon(Icons.broken_image, size: 50),
+  );
+}
+,
       );
-    } catch (e) {
-      print('Error loading image from URL: $e');
-      return Container(
-        color: Colors.grey[200],
+    } else {
+      return Image.memory(
+        base64Decode(imageUrl),
+        fit: BoxFit.cover,
         height: 300,
         width: double.infinity,
-        child: Icon(Icons.broken_image, size: 100),
       );
     }
+  } catch (e) {
+    print('Error loading image: $e');
+    return Container(
+      color: Colors.grey[200],
+      height: 300,
+      width: double.infinity,
+      child: Icon(Icons.broken_image, size: 100),
+    );
   }
+}
+
 
   // Helper function to pick an image and return it as Base64
   Future<void> _pickImage() async {

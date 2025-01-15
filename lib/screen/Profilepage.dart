@@ -73,19 +73,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _displayProfileImage() {
-    if (profilePictureUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 35,
-        backgroundImage: MemoryImage(base64Decode(profilePictureUrl)),
-      );
-    } else {
-      return CircleAvatar(
-        radius: 35,
-        backgroundImage: AssetImage('assets/avatar.png'),
-      );
-    }
+Widget _displayProfileImage() {
+  if (profilePictureUrl.isNotEmpty) {
+    return CircleAvatar(
+      radius: 35,
+      backgroundImage: NetworkImage(profilePictureUrl),
+      onBackgroundImageError: (exception, stackTrace) {
+        print('Error loading profile picture: $exception');
+      },
+    );
+  } else {
+    return CircleAvatar(
+      radius: 35,
+      backgroundImage: AssetImage('assets/avatar.png'),
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

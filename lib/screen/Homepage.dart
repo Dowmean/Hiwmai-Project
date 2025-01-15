@@ -245,21 +245,19 @@ class _HomepageScreenState extends State<HomepageScreen> {
                                           padding: const EdgeInsets.all(8.0),
                                           child: Row(
                                             children: [
-                                              CircleAvatar(
-                                                backgroundImage: product[
-                                                            'profilePicture'] !=
-                                                        null
-                                                    ? MemoryImage(base64Decode(
-                                                        product[
-                                                            'profilePicture']))
-                                                    : null,
-                                                child:
-                                                    product['profilePicture'] ==
-                                                            null
-                                                        ? Icon(Icons.person)
-                                                        : null,
-                                                radius: 16,
-                                              ),
+CircleAvatar(
+  backgroundImage: product['profilePicture'] != null
+      ? NetworkImage(product['profilePicture'])
+      : null,
+  onBackgroundImageError: (exception, stackTrace) {
+    print("Error loading profile picture: $exception");
+  },
+  child: product['profilePicture'] == null
+      ? Icon(Icons.person)
+      : null,
+  radius: 16,
+),
+
                                               SizedBox(width: 8),
                                               Text(
                                                 product['firstName'] ??
@@ -300,19 +298,13 @@ class _HomepageScreenState extends State<HomepageScreen> {
                                                       },
                                                     )
                                                   : Image.network(
-                                                      product[
-                                                          'imageUrl'], // กรณี imageUrl เป็น string URL
-                                                      fit: BoxFit.cover,
-                                                      width: double.infinity,
-                                                      errorBuilder: (context,
-                                                          error, stackTrace) {
-                                                        return Container(
-                                                          color:
-                                                              Colors.grey[200],
-                                                          child: Icon(
-                                                              Icons
-                                                                  .broken_image,
-                                                              size: 50),
+  product['imageUrl'],
+  fit: BoxFit.cover,
+  width: double.infinity,
+  errorBuilder: (context, error, stackTrace) {
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(Icons.broken_image, size: 50),
                                                         );
                                                       },
                                                     ))

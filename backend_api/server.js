@@ -12,13 +12,19 @@ const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 const multer = require('multer');
+const timeout = require('express-timeout-handler');
 
-// เปิดใช้งาน reload
-reload(app).then(() => {
-  console.log('Reload is enabled');
-}).catch(err => {
-  console.error('Failed to enable reload:', err);
-});
+
+const timeoutOptions = {
+  timeout: 60000, // 15 seconds
+  onTimeout: (req, res) => {
+    res.status(503).send({ message: 'Service Unavailable. Please try again later.' });
+  },
+  onDelayedResponse: (req, method, args, requestTime) => {
+    console.warn('Response delayed:', { method, args, requestTime });
+  },
+};
+app.use('/assets/images/messages', express.static(path.join(__dirname, 'assets', 'images', 'messages')));
 
 //chats
 // สร้าง HTTP Server
@@ -226,8 +232,140 @@ app.delete('/deleteUser', async (req, res) => {
   }
 });
 
+//Regis recipients
+app.post('/saveUserData', async (req, res) => {
+  console.log('Received data:', req.body);
+  try {
+    const connection = await getConnection();
 
-//get list req recip
+    const {
+      firebase_uid,
+      title,
+      firstName,
+      lastName,
+      phoneNumber,
+      address,
+      bankName,
+      accountName,
+      accountNumber
+    } = req.body;
+
+    console.log('Preparing to insert or update data');
+
+    // Ensure all required fields are provided
+    if (!firebase_uid  || !title || !firstName || !lastName || !phoneNumber || !address || !bankName || !accountName || !accountNumber) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Check if the user already exists
+    const [existingUser] = await connection.execute(
+      'SELECT * FROM recipients WHERE firebase_uid = ?',
+      [firebase_uid]
+    );
+
+    if (existingUser.length > 0) {
+      // Update if user exists
+      const updateSql = `
+        UPDATE recipients SET
+          title = ?, first_name = ?, last_name = ?,
+          phone_number = ?, address = ?, bank_name = ?, account_name = ?,
+          account_number = ?
+        WHERE firebase_uid = ?
+      `;
+      await connection.execute(updateSql, [
+        title,
+        firstName,
+        lastName,
+        phoneNumber,
+        address,
+        bankName,
+        accountName,
+        accountNumber,
+        firebase_uid
+      ]);
+
+      console.log('Data updated successfully');
+      res.status(200).json({ message: 'Data updated successfully' });
+    } else {
+      // Insert new record if user does not exist
+      const insertSql = `
+        INSERT INTO recipients 
+        (firebase_uid, title, first_name, last_name, phone_number, address, bank_name, account_name, account_number) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [result] = await connection.execute(insertSql, [
+        firebase_uid,
+        title,
+        firstName,
+        lastName,
+        phoneNumber,
+        address,
+        bankName,
+        accountName,
+        accountNumber
+      ]);
+      console.log('Data inserted successfully');
+      res.status(200).json({ message: 'Data saved successfully', insertedId: result.insertId });
+    }
+
+    await connection.end();
+  } catch (error) {
+    console.error('Error saving data:', error.message);
+    res.status(500).json({ message: 'Failed to save data', error: error.message });
+  }
+});
+
+
+// เพิ่ม Static Route สำหรับภาพโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
+// API สำหรับดึงข้อมูลโปรไฟล์ผู้ใช้
+app.get('/getProfile', async (req, res) => {
+  const email = req.query.email; // รับ email จาก query parameter
+
+  if (!email) {
+    return res.status(400).json({ message: 'Missing email parameter' });
+  }
+
+  try {
+    const connection = await getConnection();
+
+    // ดึงข้อมูลผู้ใช้จากฐานข้อมูล
+    const [rows] = await connection.query(
+      'SELECT first_name, profile_picture FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length > 0) {
+      const user = rows[0];
+
+      // สร้าง URL สำหรับ profile_picture
+      let profilePictureUrl = null;
+      if (user.profile_picture) {
+        profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${user.profile_picture}`;
+      }
+
+      res.json({
+        username: `${user.first_name} `,
+        profile_picture: profilePictureUrl, // ส่ง URL ของภาพโปรไฟล์แทน Base64
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+
+    await connection.end();
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+  }
+});
+
+
+
+// เพิ่ม Static Route สำหรับรูปภาพโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
+// API สำหรับดึงรายการ Recipients
 app.get('/getrecipients', async (req, res) => {
   try {
     const connection = await getConnection();
@@ -249,14 +387,20 @@ app.get('/getrecipients', async (req, res) => {
     `);
 
     if (rows.length > 0) {
-      const users = rows.map(user => ({
-        id: user.id,
-        first_name: user.first_name,
-        profile_picture: user.profile_picture
-          ? user.profile_picture.toString('base64') // Convert to Base64 for frontend
-          : null,
-        email: user.email,
-      }));
+      const users = rows.map(user => {
+        // สร้าง URL สำหรับรูปภาพโปรไฟล์
+        const profilePictureUrl = user.profile_picture
+          ? `${req.protocol}://${req.get('host')}/assets/images/profile/${user.profile_picture}`
+          : null;
+
+        return {
+          id: user.id,
+          first_name: user.first_name,
+          profile_picture: profilePictureUrl, // ส่ง URL ของรูปภาพแทน Base64
+          email: user.email,
+        };
+      });
+
       res.status(200).json(users);
     } else {
       console.log('No users found in recipients table');
@@ -269,6 +413,7 @@ app.get('/getrecipients', async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
+
 
 
 
@@ -336,6 +481,10 @@ app.delete('/deleteRecipient', async (req, res) => {
 });
 
 // ดึงข้อมูลผู้รับหิ้วบทั้งหมด
+// เพิ่ม Static Route สำหรับรูปภาพโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
+// ดึงข้อมูลผู้รับหิ้วทั้งหมด
 app.get('/recipients', async (req, res) => {
   try {
     const connection = await getConnection();
@@ -354,8 +503,8 @@ app.get('/recipients', async (req, res) => {
       firebaseUid: row.firebase_uid,
       firstName: row.first_name,
       profilePicture: row.profile_picture
-        ? row.profile_picture.toString('base64') // Convert to Base64
-        : null,
+        ? `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`
+        : null, // ส่ง URL ของรูปภาพแทน Base64
     }));
 
     res.status(200).json(recipients);
@@ -365,26 +514,30 @@ app.get('/recipients', async (req, res) => {
   }
 });
 
+
+// ดึงข้อมูลตาม firebase_uid
 // ดึงข้อมูลตาม firebase_uid
 app.get('/recipients/:firebase_uid', async (req, res) => {
-  const { firebase_uid } = req.params; // รับค่า firebase_uid จาก URL
+  const { firebase_uid } = req.params;
 
   try {
-    console.log('Requested firebase_uid:', firebase_uid); // Debug
+    console.log('Requested firebase_uid:', firebase_uid);
 
     const connection = await getConnection();
     const query = `
       SELECT 
-        bank_name, 
-        account_name, 
-        account_number
-      FROM recipients
-      WHERE firebase_uid = ?
+        r.bank_name, 
+        r.account_name, 
+        r.account_number,
+        u.profile_picture
+      FROM recipients r
+      LEFT JOIN users u ON r.firebase_uid = u.firebase_uid
+      WHERE r.firebase_uid = ?
     `;
 
     const [rows] = await connection.query(query, [firebase_uid]);
 
-    console.log('Query result:', rows); // Debug
+    console.log('Query result:', rows);
 
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Recipient not found' });
@@ -395,6 +548,9 @@ app.get('/recipients/:firebase_uid', async (req, res) => {
       bankName: recipient.bank_name,
       accountName: recipient.account_name,
       accountNumber: recipient.account_number,
+      profilePicture: recipient.profile_picture
+        ? `${req.protocol}://${req.get('host')}/assets/images/profile/${recipient.profile_picture}`
+        : null, // ส่ง URL ของรูปภาพแทน Base64
     });
   } catch (err) {
     console.error('Error fetching recipient details:', err);
@@ -402,71 +558,40 @@ app.get('/recipients/:firebase_uid', async (req, res) => {
   }
 });
 
-// API สำหรับสร้างโพสต์ใหม่
-app.post('/createpost', async (req, res) => {
-  const {
-    firebase_uid,
-    category,
-    productName,
-    productDescription,
-    price,
-    imageUrl,
-    shipping,
-    carry
-  } = req.body;
+
+app.post('/updateUserProfile', async (req, res) => {
+  const { email, first_name, gender, birth_date, profile_picture } = req.body;
 
   // ตรวจสอบฟิลด์ที่จำเป็น
-  if (
-    !firebase_uid ||
-    !category ||
-    !productName ||
-    !productDescription ||
-    !price ||
-    shipping === undefined ||
-    carry === undefined
-  ) {
+  if (!email || !first_name || !gender || !birth_date) {
     return res.status(400).send('Missing required fields');
   }
 
-  const postedDate = new Date();
-  const uploadPath = path.join(__dirname, 'assets/images/post');
+  const uploadPath = path.join(__dirname, 'assets/images/profile');
 
   // ตรวจสอบและสร้างโฟลเดอร์หากยังไม่มี
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
   }
 
+  let profilePictureFileName = null;
+
   try {
     const connection = await getConnection();
 
-    // ตรวจสอบผู้ใช้
-    const [users] = await connection.query(
-      'SELECT first_name, email FROM users WHERE firebase_uid = ?',
-      [firebase_uid]
-    );
-    const user = users[0];
-
-    if (!user) {
-      connection.end();
-      return res.status(404).send('User not found');
-    }
-
-    const { first_name, email } = user;
-
-    // แปลง Base64 เป็นไฟล์รูปภาพ
-    let imageFileName = null;
-    if (imageUrl && imageUrl.trim() !== '') {
+    // แปลง Base64 เป็นไฟล์รูปภาพ (หากส่งมา)
+    if (profile_picture && profile_picture.trim() !== '') {
       try {
-        const buffer = Buffer.from(imageUrl, 'base64');
+        const buffer = Buffer.from(profile_picture, 'base64');
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(2, 8);
-        imageFileName = `${timestamp}-${randomString}.jpg`;
-        const filePath = path.join(uploadPath, imageFileName);
+        profilePictureFileName = `profile_${timestamp}_${randomString}.jpeg`;
+        const filePath = path.join(uploadPath, profilePictureFileName);
 
         // ลดขนาดรูปภาพด้วย sharp และบันทึกไฟล์
         await sharp(buffer)
-          .resize({ width: 800 })
-          .jpeg({ quality: 70 })
+          .resize({ width: 300, height: 300 }) // ปรับขนาดรูปภาพเป็น 300x300 พิกเซล
+          .jpeg({ quality: 80 }) // ลดคุณภาพรูปภาพเพื่อให้ขนาดเล็กลง
           .toFile(filePath);
       } catch (err) {
         console.error('Error processing image with sharp:', err);
@@ -475,26 +600,27 @@ app.post('/createpost', async (req, res) => {
       }
     }
 
-    // บันทึกข้อมูลลงในฐานข้อมูล
-    const sql = `
-      INSERT INTO product (first_name, email, category, productName, productDescription, price, shipping, carry, imageUrl, postedDate)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    // อัปเดตข้อมูลในฐานข้อมูล
+    const updateQuery = `
+      UPDATE users 
+      SET first_name = ?, gender = ?, birth_date = ?, profile_picture = ?
+      WHERE email = ?
     `;
-    await connection.query(sql, [
+    const [results] = await connection.query(updateQuery, [
       first_name,
+      gender,
+      birth_date,
+      profilePictureFileName,
       email,
-      category,
-      productName,
-      productDescription,
-      price,
-      shipping,
-      carry,
-      imageFileName, // ใช้ชื่อไฟล์แทน Base64
-      postedDate,
     ]);
 
-    connection.end();
-    res.status(201).send('Post created successfully');
+    if (results.affectedRows > 0) {
+      res.status(200).send({ message: 'User profile updated successfully.' });
+    } else {
+      res.status(404).send({ message: 'User not found.' });
+    }
+
+    await connection.end();
   } catch (err) {
     console.error('Database error:', err);
     res.status(500).send('Internal Server Error');
@@ -589,6 +715,9 @@ app.delete('/deletepost/:id', async (req, res) => {
 });
 
 
+// เพิ่ม Static Route สำหรับรูปภาพโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
 // API สำหรับดึงข้อมูล Product พร้อม Profile Picture
 app.get('/getproduct', async (req, res) => {
   try {
@@ -611,7 +740,7 @@ app.get('/getproduct', async (req, res) => {
         imageUrl = imageUrl.toString(); // แปลง Buffer เป็น string
       }
 
-      // กำหนด path ของไฟล์
+      // กำหนด path ของไฟล์สินค้า
       const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrl || '');
       let productImageUrl = null;
 
@@ -623,13 +752,18 @@ app.get('/getproduct', async (req, res) => {
         console.error('Error checking image file:', error);
       }
 
+      // กำหนด path ของไฟล์โปรไฟล์
+      const profilePictureUrl = row.profile_picture
+        ? `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`
+        : null;
+
       return {
         id: row.id,
         productName: row.productName,
         category: row.category,
         price: row.price,
         imageUrl: productImageUrl, // URL รูปสินค้า
-        profilePicture: row.profile_picture ? row.profile_picture.toString('base64') : null, // รูปโปรไฟล์ใน Base64
+        profilePicture: profilePictureUrl, // URL รูปโปรไฟล์
         firstName: row.first_name || 'Unknown', // เพิ่ม first_name
         email: row.email || 'Unknown',
         postedDate: row.postedDate,
@@ -645,9 +779,12 @@ app.get('/getproduct', async (req, res) => {
   }
 });
 
-// Static route to serve image files
-app.use('/assets/images/post', express.static(path.join(__dirname, 'assets', 'images', 'post')));
 
+
+// API สำหรับดึงสินค้าตามหมวดหมู่
+// Static route to serve profile pictures
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+app.use('/assets/images/post', express.static(path.join(__dirname, 'assets', 'images', 'post')));
 
 // API สำหรับดึงสินค้าตามหมวดหมู่
 app.get('/category/:category', async (req, res) => {
@@ -671,7 +808,7 @@ app.get('/category/:category', async (req, res) => {
         imageUrl = imageUrl.toString(); // แปลง Buffer เป็น string
       }
 
-      // กำหนด path ของไฟล์
+      // กำหนด path ของไฟล์สินค้า
       const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrl || '');
       let productImageUrl = null;
 
@@ -683,13 +820,18 @@ app.get('/category/:category', async (req, res) => {
         console.error('Error checking image file:', error);
       }
 
+      // กำหนด path ของไฟล์โปรไฟล์
+      const profilePictureUrl = row.profile_picture
+        ? `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`
+        : null;
+
       return {
         id: row.id,
         productName: row.productName,
         category: row.category,
         price: row.price,
         imageUrl: productImageUrl, // URL รูปสินค้า
-        profilePicture: row.profile_picture ? row.profile_picture.toString('base64') : null, // รูปโปรไฟล์ใน Base64
+        profilePicture: profilePictureUrl, // URL รูปโปรไฟล์
         firstName: row.first_name || 'Unknown',
         email: row.email || 'Unknown',
       };
@@ -704,11 +846,103 @@ app.get('/category/:category', async (req, res) => {
   }
 });
 
-app.use('/assets/images/post', express.static(path.join(__dirname, 'assets', 'images', 'post')));
+// Static route to serve profile pictures
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
 
+app.get('/product/:id', async (req, res) => {
+  const productId = req.params.id;
+
+  if (!productId) {
+    return res.status(400).send({ message: 'Product ID is required' });
+  }
+
+  let connection;
+  try {
+    console.log('Fetching product with ID:', productId);
+
+    connection = await getConnection();
+
+    const [product] = await connection.query(
+      `
+      SELECT 
+        p.id, 
+        p.productName, 
+        p.category, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS price, 
+        p.imageUrl, 
+        p.postedDate, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry,
+        p.email,
+        u.first_name,
+        u.profile_picture
+      FROM product p
+      LEFT JOIN users u ON p.email = u.email
+      WHERE p.id = ?
+      `,
+      [productId]
+    );
+
+    if (!product || product.length === 0) {
+      console.error('Product not found');
+      return res.status(404).send({ message: 'Product not found' });
+    }
+
+    // Handle product image URL
+    let productImageUrl = null;
+    if (product[0].imageUrl) {
+      const imageUrlString = product[0].imageUrl.toString();
+      const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+      if (fs.existsSync(imagePath)) {
+        productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+      }
+    }
+
+    // Handle profile picture URL
+    let profilePictureUrl = null;
+    if (product[0].profile_picture) {
+      const profilePictureFile = product[0].profile_picture.toString(); // Convert Buffer to string if necessary
+      const profilePicturePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureFile);
+
+      if (fs.existsSync(profilePicturePath)) {
+        profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureFile}`;
+      } else {
+        console.error('Profile picture not found:', profilePicturePath);
+      }
+    }
+
+    res.status(200).send({
+      id: product[0].id,
+      productName: product[0].productName,
+      productDescription: product[0].productDescription,
+      category: product[0].category,
+      price: product[0].price,
+      imageUrl: productImageUrl,
+      postedDate: product[0].postedDate,
+      shipping: product[0].shipping,
+      carry: product[0].carry,
+      email: product[0].email,
+      firstName: product[0].first_name,
+      profilePicture: profilePictureUrl, // ส่ง URL แทนการบีบอัด
+    });
+  } catch (error) {
+    console.error('Error fetching product:', error.message);
+    console.error(error.stack);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
 
 
 //โพสต์ทั้งหมด
+// เพิ่ม static route สำหรับโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
+// API สำหรับโพสต์ทั้งหมด
 app.get('/posts', async (req, res) => {
   console.log('Incoming request for /posts');
   try {
@@ -727,10 +961,16 @@ app.get('/posts', async (req, res) => {
     `);
 
     const formattedPosts = rows.map((row) => {
-      // ตรวจสอบและสร้าง URL สำหรับ imageUrl
+      // สร้าง URL สำหรับ product image
       let productImageUrl = null;
       if (row.imageUrl) {
         productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${row.imageUrl}`;
+      }
+
+      // สร้าง URL สำหรับ profile picture
+      let profilePictureUrl = null;
+      if (row.profile_picture) {
+        profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`;
       }
 
       return {
@@ -738,11 +978,9 @@ app.get('/posts', async (req, res) => {
         productName: row.productName,
         productDescription: row.productDescription,
         price: parseFloat(row.price),
-        imageUrl: productImageUrl, // เปลี่ยนเป็น URL ของภาพ
+        imageUrl: productImageUrl, // URL สำหรับภาพสินค้า
         firstName: row.first_name || 'Unknown User',
-        profilePicture: row.profile_picture
-          ? row.profile_picture.toString('base64') // แปลง Blob เป็น Base64
-          : null,
+        profilePicture: profilePictureUrl, // URL สำหรับภาพโปรไฟล์
       };
     });
 
@@ -753,9 +991,6 @@ app.get('/posts', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 });
-
-// Static route to serve image files
-app.use('/assets/images/post', express.static(path.join(__dirname, 'assets', 'images', 'post')));
 
 
 // API สำหรับดึงโพสต์ของผู้ใช้เฉพาะรายบุคคล
@@ -770,7 +1005,6 @@ app.get('/postsByUser', async (req, res) => {
   try {
     const connection = await getConnection();
 
-    // ดึงโพสต์เฉพาะของผู้ใช้งานตาม email
     const [rows] = await connection.query(`
       SELECT 
         p.id, 
@@ -786,32 +1020,50 @@ app.get('/postsByUser', async (req, res) => {
     `, [email]);
 
     const formattedPosts = rows.map((row) => {
-      // สร้าง URL สำหรับ imageUrl
-      let productImageUrl = null;
-      if (row.imageUrl) {
-        productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${row.imageUrl}`;
+      // ตรวจสอบและแปลง imageUrl
+      let imageUrlString = row.imageUrl;
+      if (Buffer.isBuffer(imageUrlString)) {
+        imageUrlString = imageUrlString.toString(); // แปลง Buffer เป็น string
+      }
+
+      const productImageUrl = imageUrlString
+        ? `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`
+        : null;
+
+      // ตรวจสอบและแปลง profile_picture
+      let profilePictureString = row.profile_picture;
+      if (Buffer.isBuffer(profilePictureString)) {
+        profilePictureString = profilePictureString.toString(); // แปลง Buffer เป็น string
+      }
+
+      let profilePictureUrl = null;
+      if (profilePictureString) {
+        const profilePicturePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+        if (fs.existsSync(profilePicturePath)) {
+          profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+        }
       }
 
       return {
         id: row.id,
-        productName: row.productName,
-        productDescription: row.productDescription,
-        price: parseFloat(row.price),
-        imageUrl: productImageUrl, // ใช้ URL ของภาพ
+        productName: row.productName || 'Unnamed Product',
+        productDescription: row.productDescription || 'No description available',
+        price: row.price ? parseFloat(row.price) : 0.0,
+        imageUrl: productImageUrl,
         firstName: row.first_name || 'Unknown User',
-        profilePicture: row.profile_picture
-          ? row.profile_picture.toString('base64') // แปลง Blob เป็น Base64
-          : null,
+        profilePicture: profilePictureUrl,
       };
     });
 
-    console.log('Filtered posts for user:', formattedPosts); // Debug ข้อมูล
-    res.json(formattedPosts); // ส่งข้อมูลกลับใน JSON
+    console.log('Filtered posts for user:', formattedPosts);
+    res.json(formattedPosts);
   } catch (err) {
     console.error('Error fetching user posts:', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 });
+
+
 
 //PostDeatail 
 app.get('/product/:id', async (req, res) => {
@@ -954,9 +1206,6 @@ app.post('/createOrder', async (req, res) => {
   }
 });
 
-
-
-
 // API สำหรับสร้างหรืออัปเดตโปรไฟล์ผู้ใช้
 app.post('/createOrUpdateUserProfile', async (req, res) => {
   const { firebaseUid, first_name, email } = req.body;
@@ -997,41 +1246,95 @@ app.post('/createOrUpdateUserProfile', async (req, res) => {
 app.post('/updateUserProfile', async (req, res) => {
   const { email, first_name, gender, birth_date, profile_picture } = req.body;
 
-  const updateQuery = `
-    UPDATE users 
-    SET first_name = ?, gender = ?, birth_date = ?, profile_picture = ?
-    WHERE email = ?
-  `;
+  // ตรวจสอบฟิลด์ที่จำเป็น
+  if (!email || !first_name || !gender || !birth_date) {
+    return res.status(400).send('Missing required fields');
+  }
+
+  const uploadPath = path.join(__dirname, 'assets/images/profile');
+
+  // ตรวจสอบและสร้างโฟลเดอร์หากยังไม่มี
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  }
+
+  let profilePictureFileName = null;
+
   try {
     const connection = await getConnection();
-    const [results] = await connection.query(updateQuery, [first_name, gender, birth_date, profile_picture ? Buffer.from(profile_picture, 'base64') : null, email]);
-    
+
+    // แปลง Base64 เป็นไฟล์รูปภาพ (หากส่งมา)
+    if (profile_picture && profile_picture.trim() !== '') {
+      try {
+        const buffer = Buffer.from(profile_picture, 'base64');
+        const timestamp = Date.now();
+        const randomString = Math.random().toString(36).substring(2, 8);
+        profilePictureFileName = `profile_${timestamp}_${randomString}.jpeg`;
+        const filePath = path.join(uploadPath, profilePictureFileName);
+
+        // ลดขนาดรูปภาพด้วย sharp และบันทึกไฟล์
+        await sharp(buffer)
+          .resize({ width: 300, height: 300 }) // ปรับขนาดรูปภาพเป็น 300x300 พิกเซล
+          .jpeg({ quality: 80 }) // ลดคุณภาพรูปภาพเพื่อให้ขนาดเล็กลง
+          .toFile(filePath);
+      } catch (err) {
+        console.error('Error processing image with sharp:', err);
+        connection.end();
+        return res.status(400).send('Invalid image format or processing error');
+      }
+    }
+
+    // อัปเดตข้อมูลในฐานข้อมูล
+    const updateQuery = `
+      UPDATE users 
+      SET first_name = ?, gender = ?, birth_date = ?, profile_picture = ?
+      WHERE email = ?
+    `;
+    const [results] = await connection.query(updateQuery, [
+      first_name,
+      gender,
+      birth_date,
+      profilePictureFileName,
+      email,
+    ]);
+
     if (results.affectedRows > 0) {
       res.status(200).send({ message: 'User profile updated successfully.' });
     } else {
       res.status(404).send({ message: 'User not found.' });
     }
+
     await connection.end();
   } catch (err) {
-    console.error('Error updating profile:', err);
-    res.status(500).send({ message: 'Database update error: ' + err.message });
+    console.error('Database error:', err);
+    res.status(500).send('Internal Server Error');
   }
 });
 
 
 // API สำหรับดึงข้อมูลผู้ใช้
+// เพิ่ม Static Route สำหรับรูปภาพโปรไฟล์
+app.use('/assets/images/profile', express.static(path.join(__dirname, 'assets', 'images', 'profile')));
+
+// API สำหรับดึงข้อมูลโปรไฟล์ผู้ใช้
 app.get('/getUserProfile', async (req, res) => {
   const email = req.query.email;
+
   try {
     const connection = await getConnection();
     const [rows] = await connection.query('SELECT * FROM users WHERE email = ?', [email]);
 
     if (rows.length > 0) {
+      const user = rows[0];
+      const profilePictureUrl = user.profile_picture
+        ? `${req.protocol}://${req.get('host')}/assets/images/profile/${user.profile_picture}`
+        : null; // ส่ง URL ของรูปภาพแทน Base64
+
       res.json({
-        username: rows[0].first_name,
-        gender: rows[0].gender,
-        birth_date: rows[0].birth_date,
-        profile_picture: rows[0].profile_picture ? rows[0].profile_picture.toString('base64') : null, // แปลงภาพเป็น Base64
+        username: user.first_name,
+        gender: user.gender,
+        birth_date: user.birth_date,
+        profile_picture: profilePictureUrl, // ส่ง URL ของรูปภาพแทน Base64
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -1044,154 +1347,44 @@ app.get('/getUserProfile', async (req, res) => {
   }
 });
 
-//fetching all users
+
 app.get('/getAllUsers', async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.query('SELECT id, first_name, profile_picture, email FROM users');
 
     if (rows.length > 0) {
-      const users = rows.map(user => ({
-        id: user.id,
-        first_name: user.first_name,
-        profile_picture: user.profile_picture
-          ? user.profile_picture.toString('base64') // Convert to Base64 for frontend
-          : null,
-        email: user.email,
-      }));
+      const users = rows.map(user => {
+        const profilePictureUrl = user.profile_picture
+          ? `${req.protocol}://${req.get('host')}/assets/images/profile/${user.profile_picture}`
+          : null;
+
+        // Debug logging
+        console.log(`User: ${user.first_name}, Profile Picture URL: ${profilePictureUrl}`);
+
+        return {
+          id: user.id,
+          first_name: user.first_name,
+          profile_picture: profilePictureUrl, // ส่ง URL
+          email: user.email,
+        };
+      });
+
       res.json(users);
     } else {
+      console.log('No users found in database');
       res.status(404).json({ message: 'No users found' });
     }
 
     await connection.end();
   } catch (err) {
     console.error('Error fetching users:', err);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-
-// Regis recipients
-app.post('/saveUserData', async (req, res) => {
-  console.log('Received data:', req.body);
-  try {
-    const connection = await getConnection();
-
-    const {
-      firebase_uid,
-      title,
-      firstName,
-      lastName,
-      phoneNumber,
-      address,
-      bankName,
-      accountName,
-      accountNumber
-    } = req.body;
-
-    console.log('Preparing to insert or update data');
-
-    // Ensure all required fields are provided
-    if (!firebase_uid  || !title || !firstName || !lastName || !phoneNumber || !address || !bankName || !accountName || !accountNumber) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    // Check if the user already exists
-    const [existingUser] = await connection.execute(
-      'SELECT * FROM recipients WHERE firebase_uid = ?',
-      [firebase_uid]
-    );
-
-    if (existingUser.length > 0) {
-      // Update if user exists
-      const updateSql = `
-        UPDATE recipients SET
-          title = ?, first_name = ?, last_name = ?,
-          phone_number = ?, address = ?, bank_name = ?, account_name = ?,
-          account_number = ?
-        WHERE firebase_uid = ?
-      `;
-      await connection.execute(updateSql, [
-        title,
-        firstName,
-        lastName,
-        phoneNumber,
-        address,
-        bankName,
-        accountName,
-        accountNumber,
-        firebase_uid
-      ]);
-
-      console.log('Data updated successfully');
-      res.status(200).json({ message: 'Data updated successfully' });
-    } else {
-      // Insert new record if user does not exist
-      const insertSql = `
-        INSERT INTO recipients 
-        (firebase_uid, title, first_name, last_name, phone_number, address, bank_name, account_name, account_number) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      const [result] = await connection.execute(insertSql, [
-        firebase_uid,
-        title,
-        firstName,
-        lastName,
-        phoneNumber,
-        address,
-        bankName,
-        accountName,
-        accountNumber
-      ]);
-      console.log('Data inserted successfully');
-      res.status(200).json({ message: 'Data saved successfully', insertedId: result.insertId });
-    }
-
-    await connection.end();
-  } catch (error) {
-    console.error('Error saving data:', error.message);
-    res.status(500).json({ message: 'Failed to save data', error: error.message });
-  }
-});
-
-
-// API สำหรับดึงข้อมูลโปรไฟล์ผู้ใช้
-app.get('/getProfile', async (req, res) => {
-  const email = req.query.email; // รับ email จาก query parameter
-
-  if (!email) {
-    return res.status(400).json({ message: 'Missing email parameter' });
-  }
-
-  try {
-    const connection = await getConnection();
-
-    // ดึงข้อมูลผู้ใช้จากฐานข้อมูล
-    const [rows] = await connection.query(
-      'SELECT first_name, profile_picture FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length > 0) {
-      const user = rows[0];
-
-      res.json({
-        username: `${user.first_name} `,
-        profile_picture: user.profile_picture
-          ? user.profile_picture.toString('base64') // แปลงภาพเป็น Base64
-          : null,
-      });
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-
-    await connection.end();
-  } catch (err) {
-    console.error('Error fetching user profile:', err);
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
+
+
+
 
 // API สำหรับเพิ่ม/ลบรายการโปรด
 app.post('/toggleFavorite', async (req, res) => {
@@ -1280,7 +1473,6 @@ app.get('/favorites', async (req, res) => {
   }
 });
 
-//getรายการโปรดเฉพาะรายบุคคล
 app.post('/getproduct/fetchByIds', async (req, res) => {
   const { product_ids } = req.body;
 
@@ -1309,11 +1501,18 @@ app.post('/getproduct/fetchByIds', async (req, res) => {
 
     const [rows] = await connection.execute(sqlSelect, product_ids);
 
-    // จัดรูปแบบข้อมูลและสร้าง URL สำหรับ imageUrl
+    // จัดรูปแบบข้อมูลและสร้าง URL สำหรับ imageUrl และ profile_picture
     const formattedProducts = rows.map((row) => {
+      // จัดการ product image URL
       let productImageUrl = null;
       if (row.imageUrl) {
         productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${row.imageUrl}`;
+      }
+
+      // จัดการ profile picture URL
+      let profilePictureUrl = null;
+      if (row.profile_picture) {
+        profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`;
       }
 
       return {
@@ -1321,11 +1520,9 @@ app.post('/getproduct/fetchByIds', async (req, res) => {
         productName: row.productName,
         productDescription: row.productDescription,
         price: parseFloat(row.price),
-        imageUrl: productImageUrl, // ใช้ URL ของภาพ
+        imageUrl: productImageUrl, // URL ของภาพสินค้า
         firstName: row.first_name || 'Unknown User',
-        profilePicture: row.profile_picture
-          ? row.profile_picture.toString('base64') // แปลง Blob เป็น Base64
-          : null,
+        profilePicture: profilePictureUrl, // URL ของรูปโปรไฟล์
       };
     });
 
@@ -1339,120 +1536,6 @@ app.post('/getproduct/fetchByIds', async (req, res) => {
     }
   }
 });
-
-
-
-// Multer สำหรับจัดการการอัปโหลดไฟล์ภาพ
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, './uploads');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-const upload = multer({ storage });
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// API: อัปโหลดภาพ
-app.post('/upload', upload.single('image'), (req, res) => {
-  const file = req.file;
-  if (!file) {
-    return res.status(400).send('No file uploaded.');
-  }
-  res.json({ imageUrl: `/uploads/${file.filename}` });
-});
-
-// API: ดึงรายละเอียดผู้ใช้
-app.get('/getUserDetails', async (req, res) => {
-  const { email } = req.query;
-  if (!email) {
-    return res.status(400).send({ message: 'Email is required' });
-  }
-
-  let connection;
-  try {
-    connection = await getConnection();
-    const [rows] = await connection.query(
-      'SELECT first_name, profile_picture FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).send({ message: 'User not found' });
-    }
-
-    res.json({
-      first_name: rows[0].first_name,
-      profile_picture: rows[0].profile_picture
-        ? rows[0].profile_picture.toString('base64')
-        : null,
-    });
-  } catch (error) {
-    console.error('Error fetching user details:', error);
-    res.status(500).send({ message: 'Internal Server Error' });
-  } finally {
-    if (connection) {
-      await connection.end();
-    }
-  }
-});
-
-// API: ดึงข้อความแชท
-app.get('/fetchChats', async (req, res) => {
-  const { sender, receiver } = req.query;
-  if (!sender || !receiver) {
-    return res.status(400).send({ message: 'Sender and Receiver are required' });
-  }
-
-  let connection;
-  try {
-    connection = await getConnection();
-    const [rows] = await connection.query(
-      `
-      SELECT sender_email, receiver_email, message, image_url, timestamp 
-      FROM chats 
-      WHERE (sender_email = ? AND receiver_email = ?) 
-         OR (sender_email = ? AND receiver_email = ?) 
-      ORDER BY timestamp ASC
-      `,
-      [sender, receiver, receiver, sender]
-    );
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching chats:', error);
-    res.status(500).send({ message: 'Internal Server Error' });
-  } finally {
-    if (connection) {
-      await connection.end();
-    }
-  }
-});
-
-
-// API: ส่งข้อความแชท
-app.post('/sendMessage', async (req, res) => {
-  const { sender, receiver, message, imageUrl } = req.body;
-
-  if (!sender || !receiver || !message) {
-    return res.status(400).send({ message: 'Sender, Receiver, and Message are required' });
-  }
-
-  console.log('Data received from Flutter:', { sender, receiver, message, imageUrl }); // Debugging
-
-  try {
-    const connection = await getConnection();
-    await connection.query(
-      'INSERT INTO chats (sender_email, receiver_email, message, image_url) VALUES (?, ?, ?, ?)',
-      [sender, receiver, message, imageUrl]
-    );
-    res.status(200).send({ message: 'Message saved successfully' });
-  } catch (error) {
-    console.error('Error saving message:', error);
-    res.status(500).send({ message: 'Internal Server Error' });
-  }
-});
-
 
 
 // WebSocket Logic สำหรับแชทเรียลไทม์
@@ -1491,6 +1574,147 @@ io.on('connection', (socket) => {
   });
 });
 
+// API: ดึงรายละเอียดผู้ใช้
+app.get('/getUserDetails', async (req, res) => {
+  const { email } = req.query;
+  console.log(`Received email: ${email}`); // Debug email
+
+  if (!email) {
+    return res.status(400).send({ message: 'Email is required' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    const [rows] = await connection.query(
+      'SELECT first_name, profile_picture FROM users WHERE email = ?',
+      [email]
+    );
+
+    console.log(`Query Result: ${rows}`); // Debug query result
+
+    if (rows.length === 0) {
+      console.log('User not found'); // Debug user not found
+      return res.status(404).send({ message: 'User not found' });
+    }
+
+    const profilePictureUrl = rows[0].profile_picture
+    ? `${req.protocol}://${req.get('host')}/assets/images/profile/${rows[0].profile_picture}`
+    : null;
+  
+  res.json({
+    first_name: rows[0].first_name,
+    profile_picture: profilePictureUrl,
+  });
+  
+  
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+// API: ดึงข้อความแชท
+app.get('/fetchChats', async (req, res) => {
+  const { sender, receiver } = req.query;
+  if (!sender || !receiver) {
+    return res.status(400).send({ message: 'Sender and Receiver are required' });
+  }
+
+  try {
+    const connection = await getConnection();
+    const [rows] = await connection.query(
+      `
+      SELECT sender_email, receiver_email, message, image_url, timestamp 
+      FROM chats 
+      WHERE (sender_email = ? AND receiver_email = ?) 
+         OR (sender_email = ? AND receiver_email = ?) 
+      ORDER BY timestamp ASC
+      `,
+      [sender, receiver, receiver, sender]
+    );
+
+    const formattedRows = rows.map((row) => ({
+      sender_email: row.sender_email,
+      receiver_email: row.receiver_email,
+      message: row.message,
+      image_url: row.image_url
+  ? `${req.protocol}://${req.get('host')}/assets/images/messages/${row.image_url}`
+  : null,
+
+
+      timestamp: row.timestamp,
+    }));
+
+    res.json(formattedRows);
+  } catch (error) {
+    console.error('Error fetching chats:', error);
+    res.status(500).send({ message: 'Internal Server Error' });
+  }
+});
+
+app.get('/test-message-image', (req, res) => {
+  const filePath = path.join(__dirname, 'assets', 'images', 'messages', 'message_1736791055332.jpg');
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send({ message: 'File not found' });
+  }
+});
+3
+
+// Static route สำหรับเสิร์ฟรูปภาพจาก assets/images/chat
+app.use('/assets/images/chat', express.static(path.join(__dirname, 'assets', 'images', 'chat')));
+// API: ส่งข้อความแชท (รองรับรูปภาพ)
+
+// API: ส่งข้อความแชท (รองรับรูปภาพ)
+app.post('/sendMessage', async (req, res) => {
+  const { sender, receiver, message, imageBase64 } = req.body;
+
+  if (!sender || !receiver || (!message && !imageBase64)) {
+    return res.status(400).send({ message: 'Sender, Receiver, and either Message or ImageUrl are required' });
+  }
+
+  let imageUrl = null;
+
+  if (imageBase64) {
+    try {
+      const buffer = Buffer.from(imageBase64, 'base64');
+      const fileName = `message_${Date.now()}.jpg`;
+      const filePath = path.join(__dirname, 'assets', 'images', 'messages', fileName);
+
+      fs.writeFileSync(filePath, buffer);
+      imageUrl = `/assets/images/messages/${fileName}`;
+    } catch (err) {
+      console.error('Error saving image:', err);
+      return res.status(500).send({ message: 'Error saving image' });
+    }
+  }
+
+  try {
+    const connection = await getConnection();
+    await connection.query(
+      'INSERT INTO chats (sender_email, receiver_email, message, image_url) VALUES (?, ?, ?, ?)',
+      [sender, receiver, message || null, imageUrl || null]
+    );
+    res.status(200).send({ message: 'Message saved successfully', imageUrl });
+  } catch (error) {
+    console.error('Error saving message:', error);
+    res.status(500).send({ message: 'Internal Server Error' });
+  }
+})
+
+// Static route สำหรับเสิร์ฟรูปภาพจาก assets/images/chat
+app.use('/assets/images/chat', express.static(path.join(__dirname, 'assets', 'images', 'chat')));
+
+
+
 
 app.get('/getMessagesForReceiver', async (req, res) => {
   const { receiver } = req.query;
@@ -1519,7 +1743,18 @@ app.get('/getMessagesForReceiver', async (req, res) => {
       return res.status(404).send({ message: 'No messages found for this receiver' });
     }
 
-    res.json(rows);
+    res.json(
+      rows.map((row) => ({
+        sender_email: row.sender_email,
+        receiver_email: row.receiver_email,
+        message: row.message,
+        image_url: row.image_url
+          ? `${req.protocol}://${req.get('host')}/assets/images/messages/${row.image_url}`
+          : null,
+        timestamp: row.timestamp,
+      }))
+    );
+    
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).send({ message: 'Internal Server Error' });
@@ -1552,13 +1787,16 @@ app.get('/getMessageSenders', async (req, res) => {
       [email]
     );
 
-    res.json(rows.map(row => ({
-      first_name: row.first_name,
-      profile_picture: row.profile_picture
-        ? row.profile_picture.toString('base64')
-        : null,
-      sender_email: row.sender_email,
-    })));
+    res.json(
+      rows.map((row) => ({
+        first_name: row.first_name,
+        profile_picture: row.profile_picture
+          ? `${req.protocol}://${req.get('host')}/assets/images/profile/${row.profile_picture}`
+          : null,
+        sender_email: row.sender_email,
+      }))
+    );
+    
   } catch (error) {
     console.error('Error fetching message senders:', error);
     res.status(500).send({ message: 'Internal Server Error' });

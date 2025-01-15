@@ -138,44 +138,47 @@ Future<void> deleteUser(String email, String firstName) async {
               padding: const EdgeInsets.all(16.0),
               itemCount: users.length,
               separatorBuilder: (_, __) => Divider(height: 1),
-              itemBuilder: (context, index) {
-                final user = users[index];
-                final profilePicture = user['profile_picture'];
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundImage: profilePicture != null
-                              ? MemoryImage(base64Decode(profilePicture))
-                              : AssetImage('assets/avatar_placeholder.png')
-                                  as ImageProvider,
-                          radius: 25,
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          user['first_name'] ?? 'ไม่มีชื่อ',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => updateRole(user['email']),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blue, // Text color for confirm
-                          ),
-                          child: Text('ยืนยัน'),
-                        ),
-                        SizedBox(width: 8),
-OutlinedButton(
-  onPressed: () => deleteUser(user['email'], user['first_name'] ?? 'ไม่ทราบชื่อ'),
-  style: OutlinedButton.styleFrom(
-    foregroundColor: Colors.red,
-  ),
-  child: Text('ลบ'),
+itemBuilder: (context, index) {
+  final user = users[index];
+  final profilePictureUrl = user['profile_picture'];
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          CircleAvatar(
+            backgroundImage: profilePictureUrl != null && profilePictureUrl.isNotEmpty
+                ? NetworkImage(profilePictureUrl)
+                : AssetImage('assets/avatar_placeholder.png') as ImageProvider,
+            radius: 25,
+            onBackgroundImageError: (exception, stackTrace) {
+              print('Error loading profile picture: $exception');
+            },
+          ),
+          SizedBox(width: 10),
+          Text(
+            user['first_name'] ?? 'ไม่มีชื่อ',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      Row(
+        children: [
+          OutlinedButton(
+            onPressed: () => updateRole(user['email']),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.blue, // Text color for confirm
+            ),
+            child: Text('ยืนยัน'),
+          ),
+          SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: () => deleteUser(user['email'], user['first_name'] ?? 'ไม่ทราบชื่อ'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: Text('ลบ'),
 ),
 
                       ],

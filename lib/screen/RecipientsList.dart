@@ -36,36 +36,39 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
     }
   }
 
-  Widget _buildRecipientList(List<dynamic> recipients) {
-    return ListView.builder(
-      itemCount: recipients.length,
-      itemBuilder: (context, index) {
-        final recipient = recipients[index];
-        print('Recipient: $recipient'); // Debug รายการแต่ละรายการ
+Widget _buildRecipientList(List<dynamic> recipients) {
+  return ListView.builder(
+    itemCount: recipients.length,
+    itemBuilder: (context, index) {
+      final recipient = recipients[index];
+      final profilePictureUrl = recipient['profilePicture'];
 
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: recipient['profilePicture'] != null
-                ? MemoryImage(base64Decode(recipient['profilePicture']))
-                : AssetImage('assets/default_profile.png') as ImageProvider,
-          ),
-          title: Text(recipient['firstName'] ?? 'Unknown'),
-          onTap: () {
-            // ตรวจสอบค่า firebaseUid ก่อนส่งไปยังหน้ารายละเอียด
-            print('Selected firebaseUid: ${recipient['firebaseUid']}'); // Debug
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => RecipientDetailPage(
-                  firebaseUid: recipient['firebaseUid'], // ส่ง firebaseUid ไปยังหน้ารายละเอียด
-                ),
-              ),
-            );
+      return ListTile(
+        leading: CircleAvatar(
+          backgroundImage: profilePictureUrl != null && profilePictureUrl.isNotEmpty
+              ? NetworkImage(profilePictureUrl) // ใช้ NetworkImage แทน MemoryImage
+              : AssetImage('assets/default_profile.png') as ImageProvider,
+          onBackgroundImageError: (exception, stackTrace) {
+            print('Error loading profile picture: $exception');
           },
-        );
-      },
-    );
-  }
+        ),
+        title: Text(recipient['firstName'] ?? 'Unknown'),
+        onTap: () {
+          print('Selected firebaseUid: ${recipient['firebaseUid']}');
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipientDetailPage(
+                firebaseUid: recipient['firebaseUid'],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {

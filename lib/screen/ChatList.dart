@@ -18,6 +18,7 @@ class _ChatListPageState extends State<ChatListPage> {
   void initState() {
     super.initState();
     _fetchMessageSenders();
+    _fetchMessagesForReceiver(); // ดึงข้อความจาก `/getMessagesForReceiver`
   }
 
   Future<void> _fetchMessageSenders() async {
@@ -25,7 +26,8 @@ class _ChatListPageState extends State<ChatListPage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/getMessageSenders?email=$currentUserEmail'),
+        Uri.parse(
+            'http://10.0.2.2:3000/getMessageSenders?email=$currentUserEmail'),
       );
 
       if (response.statusCode == 200) {
@@ -41,6 +43,39 @@ class _ChatListPageState extends State<ChatListPage> {
       print('Error fetching message senders: $e');
     }
   }
+Future<void> _fetchMessagesForReceiver() async {
+  final currentUserEmail = FirebaseAuth.instance.currentUser!.email!;
+
+  try {
+    final response = await http.get(
+      Uri.parse(
+          'http://10.0.2.2:3000/getMessagesForReceiver?receiver=$currentUserEmail'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List;
+      setState(() {
+        // เพิ่มผู้ส่งจาก API นี้ไปยัง `_senders`
+        for (var message in data) {
+          final senderEmail = message['sender_email'];
+          // ตรวจสอบว่าผู้ส่งยังไม่ได้อยู่ใน `_senders`
+          if (!_senders.any((sender) => sender['sender_email'] == senderEmail)) {
+            _senders.add({
+              'sender_email': senderEmail,
+              'first_name': message['first_name'] ?? 'Unknown User',
+              'profile_picture': message['profile_picture'],
+            });
+          }
+        }
+        _isLoading = false;
+      });
+    } else {
+      print('Failed to fetch messages for receiver: ${response.body}');
+    }
+  } catch (e) {
+    print('Error fetching messages for receiver: $e');
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +92,16 @@ class _ChatListPageState extends State<ChatListPage> {
                 final sender = _senders[index];
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: sender['profile_picture'] != null
-                        ? MemoryImage(base64Decode(sender['profile_picture']))
-                        : null,
-                    child: sender['profile_picture'] == null
-                        ? Icon(Icons.person)
+                    backgroundImage: sender['profile_picture'] != null &&
+                            sender['profile_picture'].startsWith('http')
+                        ? NetworkImage(sender[
+                            'profile_picture']) // ใช้ NetworkImage สำหรับ URL
+                        : AssetImage('assets/avatar_placeholder.png')
+                            as ImageProvider, // กรณีไม่มีรูป ใช้ภาพเริ่มต้น
+                    backgroundColor: Colors.grey[300],
+                    child: sender['profile_picture'] == null ||
+                            !sender['profile_picture'].startsWith('http')
+                        ? Icon(Icons.person, color: Colors.white)
                         : null,
                   ),
                   title: Text(sender['first_name'] ?? 'Unknown User'),

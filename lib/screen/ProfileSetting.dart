@@ -73,8 +73,9 @@ class _ProfilesettingScreenState extends State<ProfilesettingScreen> {
 
     String? profileImageBase64;
     if (_profileImage != null) {
-      final bytes = await _profileImage!.readAsBytes();
-      profileImageBase64 = base64Encode(bytes);
+final bytes = await _profileImage!.readAsBytes();
+profileImageBase64 = base64Encode(bytes);
+
     }
 
     final response = await http.post(

@@ -90,19 +90,19 @@ class _ProductFeedScreenState extends State<ProductFeedScreen> {
     }
   }
 
-  Widget _displayProfileImage() {
-    if (profilePictureUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 30,
-        backgroundImage: MemoryImage(base64Decode(profilePictureUrl)),
-      );
-    } else {
-      return CircleAvatar(
-        radius: 30,
-        backgroundImage: AssetImage('assets/images/avatar.png'),
-      );
-    }
+Widget _displayProfileImage() {
+  if (profilePictureUrl.isNotEmpty) {
+    return CircleAvatar(
+      radius: 30,
+      backgroundImage: NetworkImage(profilePictureUrl),
+    );
+  } else {
+    return CircleAvatar(
+      radius: 30,
+      backgroundImage: AssetImage('assets/images/avatar.png'),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +255,7 @@ class ProductCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 backgroundImage: post.profilePicture != null
-                    ? MemoryImage(base64Decode(post.profilePicture!))
+                    ? NetworkImage(post.profilePicture!)
                     : AssetImage('assets/images/default_profile.png')
                         as ImageProvider,
                 radius: 20,
@@ -290,16 +290,6 @@ class ProductCard extends StatelessWidget {
                   );
                 },
               ),
-            )
-          else
-            Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
             ),
           SizedBox(height: 10),
           Text(

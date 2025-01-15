@@ -91,7 +91,19 @@ Widget _buildProductImage(dynamic imageUrl) {
       fit: BoxFit.cover,
       width: double.infinity,
       height: 120,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                    loadingProgress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
       errorBuilder: (context, error, stackTrace) {
+        print('Error loading image: $error');
         return Container(
           color: Colors.grey[200],
           height: 120,
@@ -100,7 +112,7 @@ Widget _buildProductImage(dynamic imageUrl) {
       },
     );
   } catch (e) {
-    print('Error loading image: $e');
+    print('Unexpected error loading image: $e');
     return Container(
       color: Colors.grey[200],
       height: 120,
@@ -108,6 +120,7 @@ Widget _buildProductImage(dynamic imageUrl) {
     );
   }
 }
+
 
   @override
   Widget build(BuildContext context) {
@@ -148,14 +161,13 @@ Widget _buildProductImage(dynamic imageUrl) {
                   return GestureDetector(
                     onTap: () {
                       // นำไปยังหน้ารายละเอียดสินค้าเมื่อคลิกที่รายการ
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProductDetailPage(
-                            product: product,
-                            onFavoriteUpdate: (_) {
-                              // อัปเดตข้อมูลรายการโปรดใหม่เมื่อกลับมาจากหน้ารายละเอียด
-                              _fetchFavorites();
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => ProductDetailPage(
+      product: product,
+      onFavoriteUpdate: (_) {
+        _fetchFavorites(); // Refresh favorite list
                             },
                           ),
                         ),

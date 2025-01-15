@@ -76,41 +76,35 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  Widget _displayProfileImage() {
-    if (profilePictureUrl.isNotEmpty) {
-      try {
-        return CircleAvatar(
-          radius: 50,
-          backgroundImage: MemoryImage(base64Decode(profilePictureUrl)),
-        );
-      } catch (e) {
-        print('Error decoding profile picture: $e');
-        return _defaultProfileImage();
-      }
-    } else {
-      return _defaultProfileImage();
-    }
-  }
-
-  Widget _defaultProfileImage() {
+Widget _displayProfileImage() {
+  if (profilePictureUrl.isNotEmpty) {
+    return CircleAvatar(
+      radius: 50,
+      backgroundImage: NetworkImage(profilePictureUrl),
+      onBackgroundImageError: (exception, stackTrace) {
+        print('Error loading profile picture: $exception');
+      },
+      child: Icon(Icons.person), // เพิ่มไอคอนเริ่มต้นหากโหลดไม่ได้
+    );
+  } else {
     return CircleAvatar(
       radius: 50,
       backgroundImage: AssetImage('assets/avatar.png'),
     );
   }
+}
+
+
 
 Widget _buildPostCard(dynamic post) {
-  print('Building Post Card: $post'); // Debug post data
   return GestureDetector(
     onTap: () {
-      // นำไปยังหน้า ProductDetailPage
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ProductDetailPage(
             product: post,
             onFavoriteUpdate: (updatedProduct) {
-              // อัปเดตข้อมูลโพสต์ในหน้า ProfileView หากมีการเปลี่ยนแปลง
               setState(() {
                 final index =
                     userPosts.indexWhere((p) => p['id'] == updatedProduct['id']);
@@ -133,11 +127,12 @@ Widget _buildPostCard(dynamic post) {
               ? ClipRRect(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                   child: Image.network(
-                    post['imageUrl'], // ใช้ URL แทน Base64
+                    post['imageUrl'], // ใช้ URL
                     height: 150,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
+                      print('Error loading product image: $error');
                       return Container(
                         height: 150,
                         color: Colors.grey[200],
@@ -163,13 +158,13 @@ Widget _buildPostCard(dynamic post) {
             child: Text(
               '฿${post['price']}',
               style: TextStyle(fontSize: 16, color: Colors.pink),
-              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

@@ -42,74 +42,75 @@ class _UserListPageState extends State<UserListPage> {
           } else {
             final users = snapshot.data!;
             return ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      // Profile Picture
-                      user['profile_picture'] != null
-                          ? CircleAvatar(
-                              radius: 30, // Adjust the size of the avatar
-                              backgroundImage: MemoryImage(
-                                base64Decode(user['profile_picture']),
-                              ),
-                            )
-                          : CircleAvatar(
-                              radius: 30, // Adjust the size of the avatar
-                              child: Icon(Icons.person, size: 30),
-                            ),
-                      SizedBox(width: 16), // Spacing between avatar and text
-                      // User Name
-                      Expanded(
-                        child: Text(
-                          user['first_name'],
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      // Delete Button
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red, size: 28),
-                        onPressed: () async {
-                          final confirmed = await showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text('Confirm Deletion'),
-                              content:
-                                  Text('Are you sure you want to delete this user?'),
-                              actions: [
-                                TextButton(
-                                  child: Text('Cancel'),
-                                  onPressed: () => Navigator.pop(context, false),
-                                ),
-                                TextButton(
-                                  child: Text('Delete'),
-                                  onPressed: () => Navigator.pop(context, true),
-                                ),
-                              ],
-                            ),
-                          );
+  itemCount: users.length,
+  itemBuilder: (context, index) {
+    final user = users[index];
+    final profilePictureUrl = user['profile_picture'];
+    print('Profile Picture URL: $profilePictureUrl'); // Debug URL
 
-                          if (confirmed == true) {
-                            try {
-                              await _userService.deleteUser(user['email']);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      '${user['first_name']} deleted successfully'),
-                                ),
-                              );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        children: [
+CircleAvatar(
+  radius: 30, // Adjust the size of the avatar
+  backgroundImage: profilePictureUrl != null && profilePictureUrl.isNotEmpty
+      ? NetworkImage(profilePictureUrl)
+      : null,
+  onBackgroundImageError: profilePictureUrl != null && profilePictureUrl.isNotEmpty
+      ? (exception, stackTrace) {
+          print('Error loading profile picture: $exception');
+        }
+      : null, // Don't use onBackgroundImageError if backgroundImage is null
+  child: profilePictureUrl == null || profilePictureUrl.isEmpty
+      ? Icon(Icons.person, size: 30)
+      : null,
+),
 
-                              // Refresh the user list
-                              setState(() {
-                                _usersFuture = _userService.fetchAllUsers();
-                              });
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
+          SizedBox(width: 16), // Spacing between avatar and text
+          Expanded(
+            child: Text(
+              user['first_name'],
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.delete, color: Colors.red, size: 28),
+            onPressed: () async {
+              final confirmed = await showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Confirm Deletion'),
+                  content: Text('Are you sure you want to delete this user?'),
+                  actions: [
+                    TextButton(
+                      child: Text('Cancel'),
+                      onPressed: () => Navigator.pop(context, false),
+                    ),
+                    TextButton(
+                      child: Text('Delete'),
+                      onPressed: () => Navigator.pop(context, true),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                try {
+                  await _userService.deleteUser(user['email']);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${user['first_name']} deleted successfully'),
+                    ),
+                  );
+
+                  setState(() {
+                    _usersFuture = _userService.fetchAllUsers();
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
                                 ),
                               );
                             }

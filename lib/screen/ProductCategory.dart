@@ -104,19 +104,20 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
                               child: Row(
                                 children: [
                                   // Display profile picture or default avatar
-                                  product['profilePicture'] != null &&
-                                          product['profilePicture'].isNotEmpty
-                                      ? CircleAvatar(
-                                          backgroundImage: MemoryImage(
-                                            base64Decode(
-                                                product['profilePicture']),
-                                          ),
-                                          radius: 16,
-                                        )
-                                      : CircleAvatar(
-                                          child: Icon(Icons.person, size: 16),
-                                          radius: 16,
-                                        ),
+product['profilePicture'] != null && product['profilePicture'].isNotEmpty
+    ? CircleAvatar(
+        backgroundImage: NetworkImage(product['profilePicture']),
+        radius: 16,
+        onBackgroundImageError: (exception, stackTrace) {
+          print("Error loading profile picture: $exception");
+        },
+      )
+    : CircleAvatar(
+        child: Icon(Icons.person, size: 16),
+        radius: 16,
+      ),
+
+
                                   SizedBox(width: 8),
                                   // Display first name or "Unknown"
                                   product['firstName'] != null &&
@@ -140,21 +141,26 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
                             ),
                             // Product image
                             Expanded(
-                              child: product['imageUrl'] != null &&
-                                      product['imageUrl'].isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(10)),
-                                      child: Image.network(
-                                        product['imageUrl'], // ใช้ URL
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                      ),
-                                    )
-                                  : Container(
-                                      color: Colors.grey[200],
-                                      height: 120,
-                                      child: Icon(Icons.image, size: 50),
+  child: product['imageUrl'] != null && product['imageUrl'].isNotEmpty
+      ? ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+          child: Image.network(
+  product['imageUrl'], // URL รูปภาพ
+  fit: BoxFit.cover,
+  width: double.infinity,
+  errorBuilder: (context, error, stackTrace) {
+    return Container(
+      color: Colors.grey[200],
+      child: Icon(Icons.broken_image, size: 50),
+    );
+  },
+)
+
+        )
+      : Container(
+          color: Colors.grey[200],
+          height: 120,
+          child: Icon(Icons.image, size: 50),
                                     ),
                             ),
                             // Product details
