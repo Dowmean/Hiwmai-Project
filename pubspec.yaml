@@ -1,0 +1,43 @@
+name: loginsystem
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.5.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.0.13
+  form_field_validator: ^1.1.0
+  cupertino_icons: ^1.0.2
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  firebase_admin: ^0.3.0
+  dart_firebase_admin: ^0.4.0
+  fluttertoast: ^8.2.8
+  flutter_image_compress: ^2.3.0
+  cloud_firestore: ^5.4.4 
+  firebase_storage: ^12.3.3 
+  image_picker: ^1.1.2 
+  image: ^4.3.0
+  mysql1: ^0.20.0
+  http: ^1.2.2
+  get: ^4.6.6
+  cached_network_image: ^3.4.1
+  socket_io_client: ^3.0.2
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/images/carousel1.png
+    - assets/images/carousel2.png
+    - assets/images/default_profile.png

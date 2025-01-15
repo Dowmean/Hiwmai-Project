@@ -1,0 +1,55 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"  // เพิ่ม Google services plugin ที่นี่
+}
+
+android {
+    namespace = "com.example.loginsystem"
+    compileSdk = 34  // กำหนด compileSdkVersion ให้เป็นค่าเลขจริง
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    defaultConfig {
+        applicationId = "com.example.loginsystem"
+        minSdk = 23  // กำหนด minSdkVersion ให้เป็นค่าเลขจริง
+        targetSdk = 34  // กำหนด targetSdkVersion ให้เป็นค่าเลขจริง
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    // Import the Firebase BoM (Bill of Materials)
+    implementation platform('com.google.firebase:firebase-bom:33.4.0')
+
+    // Firebase Analytics
+    implementation 'com.google.firebase:firebase-analytics'
+
+    // Firebase Authentication (ถ้าคุณต้องการ)
+    implementation 'com.google.firebase:firebase-auth'
+
+    // Firebase Firestore (ถ้าคุณต้องการ)
+    implementation 'com.google.firebase:firebase-firestore'
+}
+
+apply plugin: 'com.google.gms.google-services'  // ต้องใช้ apply plugin ที่นี่เพื่อใช้ Google Services
