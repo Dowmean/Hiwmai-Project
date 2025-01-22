@@ -58,6 +58,8 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text('หมวดหมู่: ${widget.category}'),
         backgroundColor: Colors.pink,
       ),

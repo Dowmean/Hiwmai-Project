@@ -1,3 +1,4 @@
+//นักหิ้วทั้งหมด
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -36,44 +37,49 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
     }
   }
 
-Widget _buildRecipientList(List<dynamic> recipients) {
-  return ListView.builder(
-    itemCount: recipients.length,
-    itemBuilder: (context, index) {
-      final recipient = recipients[index];
-      final profilePictureUrl = recipient['profilePicture'];
+  Widget _buildRecipientList(List<dynamic> recipients) {
+    return ListView.builder(
+      itemCount: recipients.length,
+      itemBuilder: (context, index) {
+        final recipient = recipients[index];
+        final profilePictureUrl = recipient['profilePicture'];
 
-      return ListTile(
-        leading: CircleAvatar(
-          backgroundImage: profilePictureUrl != null && profilePictureUrl.isNotEmpty
-              ? NetworkImage(profilePictureUrl) // ใช้ NetworkImage แทน MemoryImage
-              : AssetImage('assets/default_profile.png') as ImageProvider,
-          onBackgroundImageError: (exception, stackTrace) {
-            print('Error loading profile picture: $exception');
-          },
-        ),
-        title: Text(recipient['firstName'] ?? 'Unknown'),
-        onTap: () {
-          print('Selected firebaseUid: ${recipient['firebaseUid']}');
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecipientDetailPage(
-                firebaseUid: recipient['firebaseUid'],
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage:
+                profilePictureUrl != null && profilePictureUrl.isNotEmpty
+                    ? NetworkImage(
+                        profilePictureUrl) // ใช้ NetworkImage แทน MemoryImage
+                    : AssetImage('assets/default_profile.png') as ImageProvider,
+            onBackgroundImageError: (exception, stackTrace) {
+              print('Error loading profile picture: $exception');
+            },
+          ),
+          title: Text(recipient['firstName'] ?? 'Unknown'),
+          onTap: () {
+            print('Selected firebaseUid: ${recipient['firebaseUid']}');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RecipientDetailPage(
+                  firebaseUid: recipient['firebaseUid'],
+                ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Recipients')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+        title: Text('นักหิ้วทั้งหมด'),
+      ),
       body: FutureBuilder<List<dynamic>>(
         future: _recipientsFuture,
         builder: (context, snapshot) {

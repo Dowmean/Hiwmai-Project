@@ -170,6 +170,8 @@ Widget _buildPostCard(dynamic post) {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text('โปรไฟล์ผู้ใช้'),
         backgroundColor: Colors.pink,
       ),

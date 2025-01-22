@@ -16,6 +16,14 @@ class ChatPage extends StatefulWidget {
   @override
   _ChatPageState createState() => _ChatPageState();
 }
+String getFullImageUrl(String? imageUrl) {
+  if (imageUrl == null || imageUrl.isEmpty) return '';
+  if (imageUrl.startsWith('http')) {
+    return imageUrl; // URL สมบูรณ์แล้ว
+  }
+  return 'http://10.0.2.2:3000$imageUrl'; // เพิ่ม Host และ Protocol
+}
+
 
 class _ChatPageState extends State<ChatPage> {
   late IO.Socket socket;
@@ -32,26 +40,31 @@ class _ChatPageState extends State<ChatPage> {
     _fetchChatMessages();
   }
 
-  void _connectToSocket() {
-    socket = IO.io('http://10.0.2.2:3000', <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': true,
-    });
+void _connectToSocket() {
+  socket = IO.io('http://10.0.2.2:3000', <String, dynamic>{
+    'transports': ['websocket'],
+    'autoConnect': true,
+  });
 
-    socket.onConnect((_) {
-      print('Connected to server');
-      socket.emit('joinRoom', {
-        'sender': FirebaseAuth.instance.currentUser!.email,
-        'receiver': widget.receiverEmail,
-      });
+  socket.onConnect((_) {
+    print('Connected to server');
+    socket.emit('joinRoom', {
+      'sender': FirebaseAuth.instance.currentUser!.email,
+      'receiver': widget.receiverEmail,
     });
+  });
 
-    socket.on('receiveMessage', (data) {
-      setState(() {
-        _messages.add(data);
-      });
+  socket.on('receiveMessage', (data) {
+  setState(() {
+    _messages.add({
+      ...data,
+      'imageUrl': getFullImageUrl(data['imageUrl'] ?? data['image_url']),
     });
-  }
+  });
+});
+
+}
+
 
 Future<void> _fetchReceiverDetails() async {
   try {
@@ -83,10 +96,15 @@ Future<void> _fetchChatMessages() async {
         'http://10.0.2.2:3000/fetchChats?sender=$currentUserEmail&receiver=${widget.receiverEmail}'));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List;
-      if (mounted) { // Check if the widget is still mounted
+      if (mounted) {
         setState(() {
-          _messages.clear(); // Clear old messages
-          _messages.addAll(data.cast<Map<String, dynamic>>());
+          _messages.clear();
+          _messages.addAll(data.map<Map<String, dynamic>>((message) {
+            return {
+              ...message,
+              'imageUrl': getFullImageUrl(message['imageUrl'] ?? message['image_url']),
+            };
+          }).toList());
         });
       }
     } else {
@@ -96,6 +114,9 @@ Future<void> _fetchChatMessages() async {
     print("Error fetching chat messages: $e");
   }
 }
+
+
+
 Future<void> _pickImage() async {
   final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
   if (pickedFile != null) {
@@ -117,13 +138,17 @@ void _sendMessageWithImage(String base64Image) async {
     'imageBase64': base64Image,
   };
 
+  // เพิ่มข้อความชั่วคราว (Temporary) พร้อม URL รูปภาพ
+  final temporaryMessage = {
+    'sender_email': senderEmail,
+    'receiver_email': widget.receiverEmail,
+    'message': null,
+    'imageUrl': null, // Placeholder สำหรับ URL
+    'timestamp': DateTime.now().toString(),
+  };
+
   setState(() {
-    _messages.add({
-      ...messageData,
-      'timestamp': DateTime.now().toString(),
-      'sender_email': senderEmail,
-      'imageUrl': null, // Placeholder until updated by the response
-    });
+    _messages.add(temporaryMessage);
   });
 
   try {
@@ -134,19 +159,30 @@ void _sendMessageWithImage(String base64Image) async {
     );
 
     if (response.statusCode == 200) {
-  final responseData = jsonDecode(response.body);
-  setState(() {
-    // อัปเดต URL รูปภาพที่ได้รับจาก Backend
-    _messages.last['imageUrl'] = responseData['imageUrl'];
-  });
-}
- else {
+      final responseData = jsonDecode(response.body);
+      // อัปเดต URL รูปภาพในข้อความชั่วคราว
+      setState(() {
+        _messages.last['imageUrl'] =
+            getFullImageUrl(responseData['imageUrl']);
+      });
+
+      // ส่งข้อความไปยัง WebSocket
+      socket.emit('sendMessage', {
+        'sender_email': senderEmail,
+        'receiver_email': widget.receiverEmail,
+        'message': null,
+        'imageUrl': responseData['imageUrl'],
+        'timestamp': DateTime.now().toString(),
+      });
+    } else {
       print('Failed to send image: ${response.body}');
     }
   } catch (e) {
     print('Error sending image: $e');
   }
 }
+
+
 
 void _sendMessage(String text) async {
   final senderEmail = FirebaseAuth.instance.currentUser!.email;
@@ -187,38 +223,37 @@ Widget _buildMessageBubble(Map<String, dynamic> message, bool isSender) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
     child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: isSender ? MainAxisAlignment.end : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!isSender)
-  CircleAvatar(
-    radius: 20,
-    backgroundImage: receiverProfilePicture != null &&
-            receiverProfilePicture!.startsWith('http')
-        ? NetworkImage(receiverProfilePicture!)
-        : AssetImage('assets/avatar_placeholder.png') as ImageProvider,
-    backgroundColor: Colors.grey[300],
-  ),
+        if (!isSender) CircleAvatar(
+          radius: 20,
+          backgroundImage: receiverProfilePicture != null
+              ? NetworkImage(receiverProfilePicture!)
+              : AssetImage('assets/avatar_placeholder.png') as ImageProvider,
+        ),
         if (!isSender) SizedBox(width: 10),
         Flexible(
           child: Column(
             crossAxisAlignment:
                 isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                
             children: [
-if (message['imageUrl'] != null)
-  ClipRRect(
-    borderRadius: BorderRadius.circular(15),
-    child: 
-Image.network(
-  message['imageUrl'],
-  errorBuilder: (context, error, stackTrace) {
-    print("Error loading image URL: ${message['imageUrl']}, Error: $error");
-    return Icon(Icons.broken_image);
-  },
-),
-  ),
-
+              if (message['imageUrl'] != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Container(
+                    width: 200, // กำหนดความกว้างให้พอดี
+                    height: 150, // กำหนดความสูงให้เหมาะสม
+                    child: Image.network(
+                      message['imageUrl'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print("Error loading image URL: ${message['imageUrl']}, Error: $error");
+                        return Icon(Icons.broken_image);
+                      },
+                    ),
+                  ),
+                ),
               if (message['message'] != null)
                 Container(
                   padding: EdgeInsets.all(12),
@@ -239,11 +274,6 @@ Image.network(
                     ),
                   ),
                 ),
-              SizedBox(height: 5),
-              Text(
-                _formatTimestamp(message['timestamp']),
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
             ],
           ),
         ),
@@ -251,8 +281,6 @@ Image.network(
     ),
   );
 }
-
-
 
 
   String _formatTimestamp(String? timestamp) {
@@ -265,70 +293,40 @@ Image.network(
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: PreferredSize(
-      preferredSize: Size.fromHeight(80), // ปรับขนาด AppBar
-      child: SafeArea(
-        child: AppBar(
-  backgroundColor: Colors.white,
-  elevation: 0,
-  title: Row(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      CircleAvatar(
-        radius: 25,
-        backgroundImage: receiverProfilePicture != null && receiverProfilePicture!.startsWith('http')
-            ? NetworkImage(receiverProfilePicture!) // ใช้ URL
-            : receiverProfilePicture != null && receiverProfilePicture!.isNotEmpty
-                ? MemoryImage(base64Decode(receiverProfilePicture!)) // ใช้ Base64
-                : null,
-        backgroundColor: Colors.grey[300],
-        child: receiverProfilePicture == null || receiverProfilePicture!.isEmpty
-            ? Icon(Icons.person, color: Colors.white)
-            : null,
-      ),
-      SizedBox(width: 10),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.firstName,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+      preferredSize: Size.fromHeight(50), // ปรับขนาด AppBar
+      child: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false, // ลบปุ่มย้อนกลับ
+        centerTitle: true, // จัดกึ่งกลาง
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลางในแนวตั้ง
+          children: [
+            CircleAvatar(
+              radius: 15, // ปรับขนาดรูปโปรไฟล์
+              backgroundImage: receiverProfilePicture != null &&
+                      receiverProfilePicture!.startsWith('http')
+                  ? NetworkImage(receiverProfilePicture!)
+                  : receiverProfilePicture != null &&
+                          receiverProfilePicture!.isNotEmpty
+                      ? MemoryImage(base64Decode(receiverProfilePicture!))
+                      : null,
+              backgroundColor: Colors.grey[30],
+              child: receiverProfilePicture == null ||
+                      receiverProfilePicture!.isEmpty
+                  ? Icon(Icons.person, color: Colors.white)
+                  : null,
             ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfileView(email: widget.receiverEmail),
-                ),
-              );
-            },
-            child: Text(
-              'ดูโปรไฟล์',
+            SizedBox(height:2), // ระยะห่างระหว่างรูปโปรไฟล์กับชื่อ
+            Text(
+              widget.firstName,
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                        
-                    ),
-                  ),
-                  ),
-                ],
+                fontSize: 20, // ขนาดตัวอักษร
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
-            ],
-          ),
-          centerTitle: false, // ไม่ต้องจัดกึ่งกลาง
-          leading: 
-          IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () {
-              Navigator.pop(context);
-            }
-          ),
-          
-          
+            ),
+          ],
         ),
       ),
     ),
@@ -336,14 +334,15 @@ Widget build(BuildContext context) {
       children: [
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(top: 8.0), // เพิ่มระยะห่างจากด้านบน
+            padding: const EdgeInsets.only(top: 8.0),
             child: ListView.builder(
-  reverse: false,
-  itemCount: _messages.length,
-  itemBuilder: (context, index) {
-    final message = _messages[index];
-    final isSender = message['sender_email'] == FirebaseAuth.instance.currentUser!.email;
-    return _buildMessageBubble(message, isSender);
+              reverse: false,
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                final isSender =
+                    message['sender_email'] == FirebaseAuth.instance.currentUser!.email;
+                return _buildMessageBubble(message, isSender);
               },
             ),
           ),
@@ -351,38 +350,38 @@ Widget build(BuildContext context) {
         Padding(
           padding: const EdgeInsets.all(10.0),
           child: Row(
-  children: [
-    IconButton(
-      icon: Icon(Icons.camera_alt, color: Colors.pink),
-      onPressed: _pickImage, // เรียกฟังก์ชัน _pickImage เมื่อกดปุ่ม
-    ),
-    Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          color: Colors.white,
-          border: Border.all(color: Colors.pinkAccent),
-        ),
-        child: TextField(
-          controller: _messageController,
-          decoration: InputDecoration(
-            hintText: 'พิมพ์ข้อความ...',
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
-          ),
-        ),
-      ),
-    ),
-    SizedBox(width: 10),
-    GestureDetector(
-      onTap: () {
-        if (_messageController.text.trim().isNotEmpty) {
-          _sendMessage(_messageController.text.trim());
-        }
-      },
-      child: CircleAvatar(
-        backgroundColor: Colors.pink,
-        child: Icon(Icons.send, color: Colors.white),
+            children: [
+              IconButton(
+                icon: Icon(Icons.camera_alt, color: Colors.pink),
+                onPressed: _pickImage,
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    color: Colors.white,
+                    border: Border.all(color: Colors.pinkAccent),
+                  ),
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: 'พิมพ์ข้อความ...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              GestureDetector(
+                onTap: () {
+                  if (_messageController.text.trim().isNotEmpty) {
+                    _sendMessage(_messageController.text.trim());
+                  }
+                },
+                child: CircleAvatar(
+                  backgroundColor: Colors.pink,
+                  child: Icon(Icons.send, color: Colors.white),
       ),
     ),
   ],

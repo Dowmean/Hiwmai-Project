@@ -1,3 +1,4 @@
+//จัดการรบัญชีผู้ใช้ ลบ user 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'UserService.dart'; // Import your UserService
@@ -22,13 +23,9 @@ class _UserListPageState extends State<UserListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text('จัดการบัญชีผู้ใช้งาน'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
       ),
       body: FutureBuilder<List<dynamic>>(
         future: _usersFuture,

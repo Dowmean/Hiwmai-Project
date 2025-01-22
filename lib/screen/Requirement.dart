@@ -1,3 +1,4 @@
+//คำขอสมัครเป็นนักหิ้เว
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -124,12 +125,10 @@ Future<void> deleteUser(String email, String firstName) async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text('คำร้องขอเป็นนักหิ้ว', style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
         elevation: 0,
       ),
       body: users.isEmpty

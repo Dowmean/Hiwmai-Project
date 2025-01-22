@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/Payment.dart';
 
 class OrderPage extends StatefulWidget {
   final int productId; // รับ productId เท่านั้น
@@ -75,12 +76,10 @@ void _updateTotal() {
   });
 }
 
+Future<void> _createOrder(BuildContext context) async {
+  if (product == null) return;
 
-
-  Future<void> _createOrder(BuildContext context) async {
-    if (product == null) return;
-
-final double price = double.tryParse(product!['price'].toString()) ?? 0.0;
+  final double price = double.tryParse(product!['price'].toString()) ?? 0.0;
   final double shipping = double.tryParse(product!['shipping'].toString()) ?? 0.0;
   final double carry = double.tryParse(product!['carry'].toString()) ?? 0.0;
 
@@ -107,10 +106,21 @@ final double price = double.tryParse(product!['price'].toString()) ?? 0.0;
     );
 
     if (response.statusCode == 201) {
+      // หลังจากสร้างคำสั่งซื้อสำเร็จ นำข้อมูลคำสั่งซื้อไปยังหน้า PaymentPage
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('คำสั่งซื้อสำเร็จ!')),
       );
-      Navigator.pop(context);
+
+      // เปลี่ยนไปหน้า PaymentPage พร้อมส่งข้อมูล orderData
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentPage(
+            orderId: json.decode(response.body)['orderId'], // สมมติ response ส่ง orderId กลับมา
+            total: calculatedTotal,
+          ),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('ไม่สามารถสั่งซื้อได้: ${response.body}')),
@@ -122,137 +132,181 @@ final double price = double.tryParse(product!['price'].toString()) ?? 0.0;
     );
   }
 }
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('สั่งซื้อสินค้า'),
-        backgroundColor: Colors.pink,
-      ),
-      body: product == null
-          ? Center(child: CircularProgressIndicator()) // แสดง Loading ขณะโหลดข้อมูล
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // รายละเอียดสินค้า
-                  Text(
-                    product!['productName'] ?? '',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "฿${(double.tryParse(product!['price'].toString()) ?? 0.0).toStringAsFixed(2)}",
-                    style: TextStyle(fontSize: 18, color: Colors.pink),
-                  ),
-                  SizedBox(height: 20),
-                  SizedBox(height: 10),
-Text(
-  'ค่าขนส่ง: ฿${(double.tryParse(product!['shipping'].toString()) ?? 0.0).toStringAsFixed(2)}',
-  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-),
-SizedBox(height: 10),
-Text(
-  'ค่าบริการเพิ่มเติม: ฿${(double.tryParse(product!['carry'].toString()) ?? 0.0).toStringAsFixed(2)}',
-  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-),
-SizedBox(height: 20),
 
 
-                  // ฟอร์มสำหรับกรอกข้อมูล
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(labelText: 'ชื่อผู้สั่งซื้อ'),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text('รายละเอียดคำสั่งซื้อ'),
+      backgroundColor: Colors.pink,
+    ),
+    body: product == null
+        ? Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // หัวข้อที่อยู่จัดส่ง
+                Card(
+                  margin: EdgeInsets.only(bottom: 16.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ที่อยู่ในการจัดส่ง',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        SizedBox(height: 8),
+                        TextField(
+                          controller: nameController,
+                          decoration: InputDecoration(labelText: 'ชื่อผู้สั่งซื้อ'),
+                        ),
+                        TextField(
+                          controller: addressController,
+                          decoration: InputDecoration(labelText: 'ที่อยู่'),
+                          maxLines: 3,
+                        ),
+                        TextField(
+                          controller: phoneController,
+                          decoration: InputDecoration(labelText: 'เบอร์โทรศัพท์'),
+                          keyboardType: TextInputType.phone,
+                        ),
+                      ],
+                    ),
                   ),
-                  TextField(
-                    controller: addressController,
-                    decoration: InputDecoration(labelText: 'ที่อยู่'),
-                    maxLines: 3,
-                  ),
-                  TextField(
-                    controller: phoneController,
-                    decoration: InputDecoration(labelText: 'เบอร์โทรศัพท์'),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  SizedBox(height: 10),
-
-                  // หมายเหตุ
-                  TextField(
-                    controller: noteController,
-                    decoration:
-                        InputDecoration(labelText: 'หมายเหตุถึงผู้ขาย (ถ้ามี)'),
-                    maxLines: 2,
-                  ),
-                  SizedBox(height: 20),
-
-                  // จำนวนสินค้า
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('จำนวนสินค้า', style: TextStyle(fontSize: 16)),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.remove_circle_outline),
-                            onPressed: () {
-                              if (quantity > 1) {
-                                setState(() {
-                                  quantity--;
-                                  _updateTotal();
-                                });
-                              }
-                            },
+                ),
+                // รายละเอียดสินค้า
+                Card(
+                  margin: EdgeInsets.only(bottom: 16.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        // รูปภาพสินค้า
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8.0),
+                            image: DecorationImage(
+                              image: NetworkImage(product!['imageUrl']),
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                          Text('$quantity', style: TextStyle(fontSize: 18)),
-                          IconButton(
-                            icon: Icon(Icons.add_circle_outline),
-                            onPressed: () {
+                        ),
+                        SizedBox(width: 16),
+                        // ข้อมูลสินค้า
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product!['productName'],
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                '฿${(double.tryParse(product!['price'].toString()) ?? 0.0).toStringAsFixed(2)}',
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.pink),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'ค่าขนส่ง: ฿${(double.tryParse(product!['shipping'].toString()) ?? 0.0).toStringAsFixed(2)}',
+                                style: TextStyle(
+                                    fontSize: 14, color: Colors.grey[600]),
+                              ),
+                              Text(
+                                'ค่าบริการเพิ่มเติม: ฿${(double.tryParse(product!['carry'].toString()) ?? 0.0).toStringAsFixed(2)}',
+                                style: TextStyle(
+                                    fontSize: 14, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // จำนวนสินค้า
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('จำนวนสินค้า', style: TextStyle(fontSize: 16)),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.remove_circle_outline),
+                          onPressed: () {
+                            if (quantity > 1) {
                               setState(() {
-                                quantity++;
+                                quantity--;
                                 _updateTotal();
                               });
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  // ราคารวม
-                  SizedBox(height: 10),
-                  Text(
-                    'ราคารวม: ฿${total.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-
-                  // ปุ่มสั่งซื้อ
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (addressController.text.isEmpty ||
-                          phoneController.text.isEmpty ||
-                          nameController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
-                        );
-                        return;
-                      }
-                      _createOrder(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.pink,
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                            }
+                          },
+                        ),
+                        Text('$quantity', style: TextStyle(fontSize: 18)),
+                        IconButton(
+                          icon: Icon(Icons.add_circle_outline),
+                          onPressed: () {
+                            setState(() {
+                              quantity++;
+                              _updateTotal();
+                            });
+                          },
+                        ),
+                      ],
                     ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                // ราคารวม
+                Text(
+                  'รวมคำสั่งซื้อ: ฿${total.toStringAsFixed(2)}',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.pink),
+                ),
+                SizedBox(height: 16),
+                // ปุ่มยืนยันคำสั่งซื้อ
+                ElevatedButton(
+                  onPressed: () {
+                    if (addressController.text.isEmpty ||
+                        phoneController.text.isEmpty ||
+                        nameController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
+                      );
+                      return;
+                    }
+                    _createOrder(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  child: Center(
                     child: Text(
-                      'ยืนยันการสั่งซื้อ',
+                      'ยืนยันคำสั่งซื้อ',
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-    );
-  }
+          ),
+  );
+}
+
 }

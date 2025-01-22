@@ -5,6 +5,8 @@ class PostService {
   final String baseUrl = 'http://10.0.2.2:3000'; 
   final String apiUrl = 'http://10.0.2.2:3000/checkRoleAndOwnership';
   
+  get imagePath => null;
+  
 
 
   // Function to create a new post
@@ -21,16 +23,16 @@ Future<void> createPost({
     final String apiUrl = '$baseUrl/createpost'; // Full API URL
 
     // Data to send to the server
-    Map<String, dynamic> postData = {
-      'firebase_uid': firebaseUid,
-      'category': category,
-      'productName': productName,
-      'productDescription': productDescription,
-      'price': price,
-      'shipping': shipping, // ส่งค่า shipping
-      'carry': carry, // ส่งค่า carry
-      'imageUrl': imageFile, // Can be null if no image
-    };
+Map<String, dynamic> postData = {
+  'productName': productName,
+  'productDescription': productDescription,
+  'price': price,
+  'shipping': shipping,
+  'carry': carry,
+  'category': category,
+  'imageUrl': imageFile != null && imageFile.isNotEmpty ? imageFile : '',
+};
+
 
     try {
       print("Sending data: ${json.encode(postData)}");
@@ -60,7 +62,7 @@ Future<void> createPost({
 
 
   // ฟังก์ชันสำหรับแก้ไขโพสต์
-Future<void> editPost(
+Future<bool> editPost(
   int id, {
   required String productName,
   required String productDescription,
@@ -77,47 +79,55 @@ Future<void> editPost(
     'shipping': shipping,
     'carry': carry,
     'category': category,
-    'imageUrl': imagePath ?? '',
+    'imageUrl': imagePath != null && imagePath.isNotEmpty ? imagePath : null,
   };
 
   try {
-    var baseUrl;
+    final String apiUrl = 'http://10.0.2.2:3000/editpost/$id';
+    print("Sending data to backend: $postData");
+
     var response = await http.put(
-      Uri.parse('$baseUrl/editpost/$id'),
+      Uri.parse(apiUrl),
       headers: {"Content-Type": "application/json"},
       body: json.encode(postData),
     );
 
     if (response.statusCode == 200) {
       print("Post updated successfully: ${response.body}");
+      return true;
     } else {
       print("Failed to update post: ${response.statusCode}, ${response.body}");
+      return false;
     }
   } catch (e) {
     print("Error updating post: $e");
+    return false;
   }
 }
-
 
 
 
   // ฟังก์ชันสำหรับลบโพสต์
-Future<void> deletePost(int id) async {
+Future<bool> deletePost(int id) async {
   try {
-    var baseUrl;
+    final String apiUrl = 'http://10.0.2.2:3000/deletepost/$id';
     var response = await http.delete(
-      Uri.parse('$baseUrl/deletepost/$id'),
+      Uri.parse(apiUrl),
     );
 
     if (response.statusCode == 200) {
       print("Post deleted successfully: ${response.body}");
+      return true;
     } else {
       print("Failed to delete post: ${response.statusCode}, ${response.body}");
+      return false;
     }
   } catch (e) {
     print("Error deleting post: $e");
+    return false;
   }
 }
+
 
 
 Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {

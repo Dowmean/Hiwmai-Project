@@ -24,7 +24,7 @@ const timeoutOptions = {
     console.warn('Response delayed:', { method, args, requestTime });
   },
 };
-app.use('/assets/images/messages', express.static(path.join(__dirname, 'assets', 'images', 'messages')));
+
 
 //chats
 // สร้าง HTTP Server
@@ -38,7 +38,7 @@ const io = new Server(server);
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
-
+app.use(express.json({ limit: '10mb' }));
 // ตั้งค่า Firebase Admin SDK
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
@@ -632,16 +632,21 @@ app.put('/editpost/:id', async (req, res) => {
   const { id } = req.params;
   const { productName, productDescription, price, category, imageUrl, shipping, carry } = req.body;
 
+  // Log ข้อมูลที่รับมาจาก Frontend
+  console.log('Received request to edit post:');
+  console.log('Params:', req.params);
+  console.log('Body:', req.body);
+
   try {
     const connection = await getConnection();
 
-    // ดึงข้อมูลโพสต์เก่าเพื่อลบรูปภาพเดิมออก
     const [rows] = await connection.query('SELECT imageUrl FROM product WHERE id = ?', [id]);
-    const oldImagePath = rows[0]?.imageUrl || null;
+    console.log('Existing post image path:', rows); // Log รูปภาพเดิม (ถ้ามี)
 
+    const oldImagePath = rows[0]?.imageUrl || null;
     let newImagePath = oldImagePath;
 
-    // ถ้ามีรูปภาพใหม่
+    // ถ้ามีการอัปโหลดรูปภาพใหม่
     if (imageUrl && imageUrl.trim() !== '') {
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 8);
@@ -655,18 +660,22 @@ app.put('/editpost/:id', async (req, res) => {
         .toFile(newFilePath);
 
       newImagePath = `assets/images/post/${newFileName}`;
+      console.log('New image path:', newImagePath);
 
+      // ลบรูปภาพเก่าถ้าพบ
       if (oldImagePath && fs.existsSync(path.join(__dirname, oldImagePath))) {
         fs.unlinkSync(path.join(__dirname, oldImagePath));
+        console.log('Deleted old image:', oldImagePath);
       }
     }
 
-    // อัปเดตโพสต์ในฐานข้อมูล
     const sql = `
       UPDATE product
       SET productName = ?, productDescription = ?, price = ?, category = ?, imageUrl = ?, shipping = ?, carry = ?
       WHERE id = ?`;
-    await connection.query(sql, [
+    console.log('SQL Query:', sql);
+
+    const [result] = await connection.query(sql, [
       productName,
       productDescription,
       price,
@@ -674,11 +683,18 @@ app.put('/editpost/:id', async (req, res) => {
       newImagePath,
       shipping,
       carry,
-      id
+      id,
     ]);
 
+    console.log('SQL Result:', result);
+
     await connection.end();
-    res.json({ message: 'Post updated successfully' });
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Post updated successfully' });
+    } else {
+      res.status(404).json({ message: 'Post not found or no changes made' });
+    }
   } catch (error) {
     console.error('Error updating post:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -690,29 +706,43 @@ app.put('/editpost/:id', async (req, res) => {
 app.delete('/deletepost/:id', async (req, res) => {
   const { id } = req.params;
 
+  // Log ข้อมูลที่รับมาจาก Frontend
+  console.log('Received request to delete post:');
+  console.log('Params:', req.params);
+
   try {
     const connection = await getConnection();
 
-    // ดึงข้อมูลโพสต์เพื่อลบรูปภาพ
     const [rows] = await connection.query('SELECT imageUrl FROM product WHERE id = ?', [id]);
+    console.log('Existing post image path:', rows); // Log รูปภาพเดิม (ถ้ามี)
+
     const imagePath = rows[0]?.imageUrl || null;
 
-    // ลบโพสต์ในฐานข้อมูล
     const sql = 'DELETE FROM product WHERE id = ?';
-    await connection.query(sql, [id]);
+    console.log('SQL Query:', sql);
 
-    // ลบไฟล์รูปภาพ (ถ้ามี)
+    const [result] = await connection.query(sql, [id]);
+    console.log('SQL Result:', result);
+
     if (imagePath && fs.existsSync(path.join(__dirname, imagePath))) {
       fs.unlinkSync(path.join(__dirname, imagePath));
+      console.log('Deleted image file:', imagePath);
     }
 
     await connection.end();
-    res.json({ message: 'Post deleted successfully' });
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Post deleted successfully' });
+    } else {
+      res.status(404).json({ message: 'Post not found' });
+    }
   } catch (error) {
     console.error('Error deleting post:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+
 
 
 // เพิ่ม Static Route สำหรับรูปภาพโปรไฟล์
@@ -1167,7 +1197,6 @@ app.get('/product/:id', async (req, res) => {
 });
 
 
-// API: สร้างคำสั่งซื้อใหม่
 app.post('/createOrder', async (req, res) => {
   const { email, name, address, phone_number, total, num, note, product_id, image } = req.body;
 
@@ -1180,22 +1209,28 @@ app.post('/createOrder', async (req, res) => {
     connection = await getConnection();
 
     // ตรวจสอบและแปลง total ให้เป็นตัวเลขก่อนบันทึก
-    const parsedTotal = parseFloat(total); // แปลง total เป็นตัวเลข
+    const parsedTotal = parseFloat(total);
 
     if (isNaN(parsedTotal)) {
       return res.status(400).send({ message: 'Invalid total value' });
     }
 
-    const result = await connection.query(
+    // ตรวจสอบค่า image ถ้าไม่มี ให้ใช้ null
+    const validatedImage = image || null;
+
+    // สร้าง ref ล่วงหน้า
+    const generatedRef = `ORD${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+
+    // ดำเนินการ INSERT
+    await connection.execute(
       `INSERT INTO orders 
       (ref, email, name, address, phone_number, total, num, note, product_id, image, shopdate, status) 
-      VALUES (
-        CONCAT('ORD', DATE_FORMAT(NOW(), '%Y%m%d'), LPAD(FLOOR(RAND() * 100000), 6, '0')),
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'กำลังจัดส่ง')`,
-      [email, name, address, phone_number, parsedTotal, num, note, product_id, image]
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'ยังไม่ชำระ')`,
+      [generatedRef, email, name, address, phone_number, parsedTotal, num, note, product_id, validatedImage]
     );
 
-    res.status(201).send({ message: 'Order created successfully', order_id: result.insertId });
+    // ส่ง ref กลับใน response
+    res.status(201).send({ message: 'Order created successfully', ref: generatedRef });
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).send({ message: 'Internal Server Error' });
@@ -1205,6 +1240,1291 @@ app.post('/createOrder', async (req, res) => {
     }
   }
 });
+
+
+// API: ดึงข้อมูลคำสั่งซื้อ
+app.get('/getOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ?
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ยังไม่ชำระ"
+app.get('/TopayOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email;
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    console.log('Database connected');
+
+    // ดึงข้อมูล
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE o.email = ? AND o.status = 'ยังไม่ชำระ'
+      `,
+      [userEmail]
+    );
+
+    console.log('Query result:', orders);
+
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No unpaid orders found for this user' });
+    }
+
+    res.status(200).send({
+      message: 'Unpaid orders fetched successfully',
+      orders,
+    });
+  } catch (error) {
+    console.error('Error fetching unpaid orders:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+//Admin 
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ยังไม่ชำระ"
+app.get('/ToPayOrders', async (req, res) => {
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // ดึงข้อมูลจากตาราง orders, product, และ users เฉพาะที่ status = "ยังไม่ชำระ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE o.status = 'ยังไม่ชำระ'
+      `
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No unpaid orders found' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Unpaid orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching unpaid orders:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ยังไม่ชำระ"  //Recipt
+app.get('/getTopayOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users เฉพาะที่ status = "สำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ? AND o.status = 'ยังไม่ชำระ'
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No completed orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Completed orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// API: อัปเดตสถานะคำสั่งซื้อเป็น 'ชำระเงินสำเร็จ'
+app.put('/updateOrderStatus', async (req, res) => {
+  const { orderRef } = req.body; // รับค่า orderRef จาก body
+
+  if (!orderRef) {
+    return res.status(400).send({ message: 'Missing required parameter: orderRef' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // อัปเดตสถานะคำสั่งซื้อ
+    const [result] = await connection.query(
+      `UPDATE orders SET status = 'ชำระเงินสำเร็จ' WHERE ref = ?`,
+      [orderRef]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send({ message: 'Order not found or already updated.' });
+    }
+
+    res.status(200).send({ message: 'Order status updated successfully.' });
+  } catch (error) {
+    console.error('Error updating order status:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ชำระเงินสำเร็จ"
+app.get('/PaymentcompletedOrders', async (req, res) => {
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // ดึงข้อมูลจากตาราง orders, product, และ users เฉพาะที่ status = "ชำระเงินสำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE o.status = 'ชำระเงินสำเร็จ'
+      `
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No unpaid orders found' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Unpaid orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching unpaid orders:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ที่ต้องจัดส่ง"
+app.get('/getToshipOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users เฉพาะที่ status = "สำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ? AND o.status = 'ที่ต้องจัดส่ง'
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No completed orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Completed orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+//เพิ่มเลขพัสดุ
+app.post('/addTrackingNumber', async (req, res) => {
+  const { ref, trackingNumber } = req.body;
+
+  if (!ref || !trackingNumber) {
+    return res.status(400).send({ message: 'Missing required parameters' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // ตรวจสอบคำสั่งซื้อและดึง email ของเจ้าของสินค้า
+    const [order] = await connection.query(
+      `
+      SELECT o.*, p.email AS owner_email
+      FROM orders o
+      JOIN product p ON o.product_id = p.id
+      WHERE o.ref = ?
+      `,
+      [ref]
+    );
+
+    if (!order.length) {
+      return res.status(404).send({ message: 'Order not found' });
+    }
+
+    const { owner_email } = order[0];
+
+    // เพิ่มเลขพัสดุใน Table purchase
+    await connection.query(
+      `
+      INSERT INTO purchase (ref, email, trackingnumber, confirm_order)
+      VALUES (?, ?, ?, TRUE)
+      ON DUPLICATE KEY UPDATE
+      trackingnumber = VALUES(trackingnumber),
+      confirm_order = TRUE
+      `,
+      [ref, owner_email, trackingNumber]
+    );
+
+    // อัปเดตสถานะใน Table orders เป็น "กำลังจัดส่ง"
+    await connection.query(
+      `
+      UPDATE orders
+      SET status = 'กำลังจัดส่ง'
+      WHERE ref = ?
+      `,
+      [ref]
+    );
+
+    res.status(200).send({ message: 'Tracking number added and status updated successfully' });
+  } catch (error) {
+    console.error('Error adding tracking number:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "กำลังจัดส่ง"
+app.get('/getShippingOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users เฉพาะที่ status = "สำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ? AND o.status = 'กำลังจัดส่ง'
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No completed orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Completed orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+app.get('/getReviewDetails', async (req, res) => {
+  const { email, orderRef } = req.query;
+
+  if (!email || !orderRef) {
+    return res.status(400).send({ message: 'Missing required parameters' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    const [reviewDetails] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref,
+        o.email AS order_email,
+        p.productName,
+        p.imageUrl AS product_image,
+        u.first_name,
+        u.profile_picture,
+        r.rate AS review_rate,
+        r.description AS review_description
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      LEFT JOIN reviews r ON o.ref = r.ref
+      WHERE o.email = ? AND o.ref = ?
+      `,
+      [email, orderRef]
+    );
+
+    if (!reviewDetails || reviewDetails.length === 0) {
+      return res.status(404).send({ message: 'No review found for this order' });
+    }
+
+    const review = reviewDetails[0];
+
+    // Debug ข้อมูลก่อนแปลง
+    console.log('Fetched Review:', review);
+
+    // ตรวจสอบและแปลงค่าที่เป็น Buffer ให้เป็น String
+    const productImage = Buffer.isBuffer(review.product_image)
+      ? review.product_image.toString()
+      : review.product_image;
+
+    const profilePicture = Buffer.isBuffer(review.profile_picture)
+      ? review.profile_picture.toString()
+      : review.profile_picture;
+
+    // จัดการรูปภาพสินค้า
+    let productImageUrl = null;
+    if (productImage) {
+      const productImagePath = path.join(__dirname, 'assets', 'images', 'post', productImage);
+      if (fs.existsSync(productImagePath)) {
+        productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${productImage}`;
+      } else {
+        console.warn(`Product image not found: ${productImagePath}`);
+      }
+    }
+
+    // จัดการรูปโปรไฟล์ผู้ใช้งาน
+    let profilePictureUrl = null;
+    if (profilePicture) {
+      const profilePicturePath = path.join(__dirname, 'assets', 'images', 'profile', profilePicture);
+      if (fs.existsSync(profilePicturePath)) {
+        profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePicture}`;
+      } else {
+        console.warn(`Profile picture not found: ${profilePicturePath}`);
+      }
+    }
+
+    // Debug ข้อมูล URL ที่สร้าง
+    console.log('Product Image URL:', productImageUrl);
+    console.log('Profile Picture URL:', profilePictureUrl);
+
+    // ส่งข้อมูลพร้อมลิงก์รูปภาพที่ปรับแล้ว
+    res.status(200).send({
+      order_ref: review.order_ref,
+      order_email: review.order_email,
+      first_name: review.first_name, // เพิ่ม u.first_name
+      productName: review.productName,
+      product_image: productImageUrl,
+      profile_picture: profilePictureUrl,
+      review_rate: review.review_rate,
+      review_description: review.review_description,
+    });
+  } catch (error) {
+    console.error('Error fetching review details:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "สำเร็จ"
+app.get('/getCompletedOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users เฉพาะที่ status = "สำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ? AND o.status = 'สำเร็จ'
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No completed orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Completed orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+// API: ดึงข้อมูลคำสั่งซื้อที่สถานะเป็น "ให้คะแนน"
+app.get('/getReviewsOrdersByEmail', async (req, res) => {
+  const userEmail = req.query.email; // รับ email จาก Query Parameter
+
+  if (!userEmail) {
+    return res.status(400).send({ message: 'Missing required parameter: email' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // JOIN ตาราง orders, product, และ users เฉพาะที่ status = "สำเร็จ"
+    const [orders] = await connection.query(
+      `
+      SELECT 
+        o.ref AS order_ref, 
+        o.email AS order_email, 
+        o.name, 
+        o.address, 
+        o.phone_number, 
+        o.total, 
+        o.num AS quantity, 
+        o.note, 
+        o.product_id, 
+        o.shopdate, 
+        o.status, 
+        p.productName, 
+        p.productDescription, 
+        CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+        p.imageUrl AS product_image, 
+        p.category, 
+        CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+        CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost, 
+        p.email AS product_email, 
+        u.first_name AS ordered_by, 
+        u.profile_picture
+      FROM orders o
+      LEFT JOIN product p ON o.product_id = p.id
+      LEFT JOIN users u ON o.email = u.email
+      WHERE p.email = ? AND o.status = 'ให้คะแนน'
+      `,
+      [userEmail] // กรอง product.email ให้ตรงกับ userEmail
+    );
+
+    // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+    if (!orders || orders.length === 0) {
+      return res.status(404).send({ message: 'No completed orders found for this user' });
+    }
+
+    // จัดการ product_image และ profile_picture
+    const processedOrders = await Promise.all(
+      orders.map(async (order) => {
+        let productImageUrl = null;
+        let profilePictureUrl = null;
+
+        // แปลง product_image เป็น URL หรือ Base64
+        if (order.product_image) {
+          let imageUrlString = order.product_image;
+          if (Buffer.isBuffer(imageUrlString)) {
+            imageUrlString = imageUrlString.toString();
+          }
+
+          const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+          if (fs.existsSync(imagePath)) {
+            productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+          }
+        }
+
+        // แปลง profile_picture เป็น URL
+        if (order.profile_picture) {
+          let profilePictureString = order.profile_picture;
+          if (Buffer.isBuffer(profilePictureString)) {
+            profilePictureString = profilePictureString.toString();
+          }
+
+          const profilePath = path.join(__dirname, 'assets', 'images', 'profile', profilePictureString);
+          if (fs.existsSync(profilePath)) {
+            profilePictureUrl = `${req.protocol}://${req.get('host')}/assets/images/profile/${profilePictureString}`;
+          }
+        }
+
+        return {
+          ...order,
+          product_image: productImageUrl,
+          profile_picture: profilePictureUrl,
+        };
+      })
+    );
+
+    res.status(200).send({
+      message: 'Completed orders fetched successfully',
+      orders: processedOrders,
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders by email:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+// API: ยกเลิกคำสั่งซื้อ
+app.put('/cancelOrder', async (req, res) => {
+  const { orderRef } = req.body;
+
+  if (!orderRef) {
+    return res.status(400).send({ message: 'Missing required parameter: orderRef' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    const [result] = await connection.query(
+      `UPDATE orders SET status = 'ยกเลิก' WHERE ref = ?`,
+      [orderRef]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send({ message: 'Order not found' });
+    }
+
+    res.status(200).send({ message: 'Order canceled successfully' });
+  } catch (error) {
+    console.error('Error updating order status:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+
+// API: เพิ่มรีวิวสำหรับคำสั่งซื้อ
+app.post('/addReview', async (req, res) => {
+  const { ref, email, rate, description } = req.body;
+
+  if (!ref || !email || !rate || rate < 1 || rate > 5 || !description) {
+    return res.status(400).send({
+      message: 'Missing or invalid parameters. Please ensure all fields are valid.',
+    });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // ตรวจสอบว่าคำสั่งซื้อมีอยู่ใน Table: orders และสถานะเป็น "สำเร็จ"
+    const [orderCheck] = await connection.query(
+      'SELECT * FROM orders WHERE ref = ? AND email = ? AND status = "สำเร็จ"',
+      [ref, email]
+    );
+
+    if (orderCheck.length === 0) {
+      return res.status(404).send({
+        message: 'Order not found or not completed. Cannot add review.',
+      });
+    }
+
+    // เพิ่มรีวิวลงใน Table: reviews
+    const [insertResult] = await connection.query(
+      `
+      INSERT INTO reviews (ref, email, rate, description)
+      VALUES (?, ?, ?, ?)
+      `,
+      [ref, email, rate, description]
+    );
+
+    // อัปเดตสถานะใน Table: orders ให้เป็น "ให้คะแนน"
+    await connection.query(
+      `
+      UPDATE orders
+      SET status = "ให้คะแนน"
+      WHERE ref = ? AND email = ?
+      `,
+      [ref, email]
+    );
+
+    res.status(201).send({
+      message: 'Review added successfully and order status updated!',
+      reviewId: insertResult.insertId,
+    });
+  } catch (error) {
+    console.error('Error adding review:', error.message);
+    res.status(500).send({ message: 'Internal Server Error' });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
+
+
+
+// // API: ดึงข้อมูลคำสั่งซื้อ
+// app.get('/getOrderWithProduct/:orderId', async (req, res) => {
+//   const { orderId } = req.params;
+
+//   if (!orderId) {
+//     return res.status(400).send({ message: 'Missing required parameter: orderId' });
+//   }
+
+//   let connection;
+//   try {
+//     connection = await getConnection();
+
+//     // JOIN ตาราง orders และ product
+//     const [order] = await connection.query(
+//       `
+//       SELECT 
+//         o.ref AS order_ref, 
+//         o.email, 
+//         o.name, 
+//         o.address, 
+//         o.phone_number, 
+//         o.total, 
+//         o.num AS quantity, 
+//         o.note, 
+//         o.product_id, 
+//         o.image AS order_image, 
+//         o.shopdate, 
+//         o.status, 
+//         p.productName, 
+//         p.productDescription, 
+//         CAST(p.price AS DECIMAL(10, 2)) AS product_price, 
+//         p.imageUrl AS product_image, 
+//         p.category, 
+//         CAST(p.shipping AS DECIMAL(10, 2)) AS shipping_cost, 
+//         CAST(p.carry AS DECIMAL(10, 2)) AS carry_cost
+//       FROM orders o
+//       LEFT JOIN product p ON o.product_id = p.id
+//       WHERE o.ref = ?
+//       `,
+//       [orderId] // ใช้ orderId แทน o.id
+//     );
+
+//     // ตรวจสอบว่าพบคำสั่งซื้อหรือไม่
+//     if (!order || order.length === 0) {
+//       return res.status(404).send({ message: 'Order not found' });
+//     }
+
+//     // จัดการการแปลง URL รูปภาพ (หากมี)
+//     let productImageUrl = null;
+//     if (order[0].product_image) {
+//       let imageUrlString = order[0].product_image;
+
+//       // แปลง Buffer เป็น string (ถ้าจำเป็น)
+//       if (Buffer.isBuffer(imageUrlString)) {
+//         imageUrlString = imageUrlString.toString(); // แปลง Buffer เป็น string
+//       }
+
+//       const imagePath = path.join(__dirname, 'assets', 'images', 'post', imageUrlString);
+//       if (fs.existsSync(imagePath)) {
+//         productImageUrl = `${req.protocol}://${req.get('host')}/assets/images/post/${imageUrlString}`;
+//       }
+//     }
+
+//     res.status(200).send({
+//       message: 'Order with product fetched successfully',
+//       order: {
+//         orderRef: order[0].order_ref,
+//         email: order[0].email,
+//         name: order[0].name,
+//         address: order[0].address,
+//         phoneNumber: order[0].phone_number,
+//         total: order[0].total,
+//         quantity: order[0].quantity,
+//         note: order[0].note,
+//         shopDate: order[0].shopdate,
+//         status: order[0].status,
+//       },
+//       product: {
+//         productId: order[0].product_id,
+//         productName: order[0].productName,
+//         productDescription: order[0].productDescription,
+//         price: order[0].product_price,
+//         category: order[0].category,
+//         shippingCost: order[0].shipping_cost,
+//         carryCost: order[0].carry_cost,
+//         productImageUrl: productImageUrl,
+//       },
+//     });
+//   } catch (error) {
+//     console.error('Error fetching order with product:', error.message);
+//     res.status(500).send({ message: 'Internal Server Error' });
+//   } finally {
+//     if (connection) {
+//       await connection.end();
+//     }
+//   }
+// });
+
 
 // API สำหรับสร้างหรืออัปเดตโปรไฟล์ผู้ใช้
 app.post('/createOrUpdateUserProfile', async (req, res) => {
@@ -1547,7 +2867,14 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     console.log(`${sender} joined room: ${roomId}`);
   });
-
+  
+  io.on('connection', (socket) => {
+    socket.on('sendMessage', (data) => {
+      // แจ้งข้อความให้ Client ฝั่ง Receiver
+      io.to(data.receiver).emit('receiveMessage', data);
+    });
+  });
+  
   socket.on('sendMessage', async (data) => {
     const { sender, receiver, message, imageUrl } = data;
     const roomId = [sender, receiver].sort().join('_');
@@ -1645,8 +2972,9 @@ app.get('/fetchChats', async (req, res) => {
       receiver_email: row.receiver_email,
       message: row.message,
       image_url: row.image_url
-  ? `${req.protocol}://${req.get('host')}/assets/images/messages/${row.image_url}`
+  ? `${req.protocol}://${req.get('host')}/assets/images/messages/${path.basename(row.image_url)}`
   : null,
+
 
 
       timestamp: row.timestamp,
@@ -1670,7 +2998,7 @@ app.get('/test-message-image', (req, res) => {
 3
 
 // Static route สำหรับเสิร์ฟรูปภาพจาก assets/images/chat
-app.use('/assets/images/chat', express.static(path.join(__dirname, 'assets', 'images', 'chat')));
+app.use('/assets/images/messages', express.static(path.join(__dirname, 'assets', 'images', 'messages')));
 // API: ส่งข้อความแชท (รองรับรูปภาพ)
 
 // API: ส่งข้อความแชท (รองรับรูปภาพ)
@@ -1711,7 +3039,7 @@ app.post('/sendMessage', async (req, res) => {
 })
 
 // Static route สำหรับเสิร์ฟรูปภาพจาก assets/images/chat
-app.use('/assets/images/chat', express.static(path.join(__dirname, 'assets', 'images', 'chat')));
+app.use('/assets/images/messages', express.static(path.join(__dirname, 'assets', 'images', 'messages')));
 
 
 
@@ -1749,8 +3077,9 @@ app.get('/getMessagesForReceiver', async (req, res) => {
         receiver_email: row.receiver_email,
         message: row.message,
         image_url: row.image_url
-          ? `${req.protocol}://${req.get('host')}/assets/images/messages/${row.image_url}`
-          : null,
+  ? `${req.protocol}://${req.get('host')}/assets/images/messages/${path.basename(row.image_url)}`
+  : null,
+
         timestamp: row.timestamp,
       }))
     );

@@ -29,44 +29,59 @@ class _ProfilesettingScreenState extends State<ProfilesettingScreen> {
     _fetchUserData();
   }
 
-  Future<void> _fetchUserData() async {
-    try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:3000/getUserProfile?email=$email'));
+Future<void> _fetchUserData() async {
+  try {
+    final response = await http.get(Uri.parse('http://10.0.2.2:3000/getUserProfile?email=$email'));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _usernameController.text = data['username'] ?? ''; // อัปเดต TextEditingController
-          gender = data['gender'] ?? 'ชาย';
-          birthDate = DateTime.tryParse(data['birth_date'] ?? '');
-          profileImageUrl = data['profile_picture'] ?? ''; // เก็บ Base64 ของภาพโปรไฟล์
-        });
-      } else {
-        print("Failed to load profile data");
-      }
-    } catch (e) {
-      print("Error fetching profile data: $e");
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        _usernameController.text = data['username'] ?? '';
+        gender = data['gender'] ?? 'ชาย';
+        birthDate = DateTime.tryParse(data['birth_date'] ?? '');
+        profileImageUrl = data['profile_picture'] ?? '';
+
+        // ตรวจสอบและเพิ่ม Host หาก URL ไม่สมบูรณ์
+        if (profileImageUrl.isNotEmpty && !profileImageUrl.startsWith('http')) {
+          profileImageUrl = 'http://10.0.2.2:3000$profileImageUrl';
+        }
+      });
+    } else {
+      print("Failed to load profile data");
     }
+  } catch (e) {
+    print("Error fetching profile data: $e");
   }
+}
 
-  Widget _displayProfileImage() {
-    if (_profileImage != null) {
+
+Widget _displayProfileImage() {
+  if (_profileImage != null) {
+    return CircleAvatar(
+      radius: 50,
+      backgroundImage: FileImage(_profileImage!),
+    );
+  } else if (profileImageUrl.isNotEmpty) {
+    // ตรวจสอบว่าเป็น URL หรือ Base64
+    if (profileImageUrl.startsWith('http')) {
       return CircleAvatar(
         radius: 50,
-        backgroundImage: FileImage(_profileImage!),
-      );
-    } else if (profileImageUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 50,
-        backgroundImage: MemoryImage(base64Decode(profileImageUrl)), // แสดงภาพจาก Base64
+        backgroundImage: NetworkImage(profileImageUrl), // ใช้ URL
       );
     } else {
       return CircleAvatar(
         radius: 50,
-        backgroundImage: AssetImage('assets/avatar.png'),
+        backgroundImage: MemoryImage(base64Decode(profileImageUrl)), // ใช้ Base64
       );
     }
+  } else {
+    return CircleAvatar(
+      radius: 50,
+      backgroundImage: AssetImage('assets/avatar.png'),
+    );
   }
+}
+
 
   Future<void> _updateProfile() async {
     _formKey.currentState!.save(); // บันทึกค่าจาก TextFormField ลงใน username ก่อนอัปเดต
@@ -104,13 +119,9 @@ profileImageBase64 = base64Encode(bytes);
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text('แก้ไขข้อมูลส่วนตัว'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
       ),
       body: SingleChildScrollView(
         child: Form(
