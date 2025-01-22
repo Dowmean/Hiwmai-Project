@@ -1,29 +1,50 @@
-SET UP PROJECT !
-install 
--Tools • Dart 3.5.4 • DevTools 2.37.3
--jdk-17.0.12
+# SET UP PROJECT
 
-Android studio
--Android Emulator 
--Android sdk Build-Tools 36-rc1 
--Android sdk Commandline-Tools
--Android sdk Platform -Tools
--Android Emulator hypervisor driver (install)
+## Install
+- Tools:
+  - Dart 3.5.4
+  - DevTools 2.37.3
+  - JDK: jdk-17.0.12
+  - JavaScript: v22.11.0
+- Android Studio
+- Visual Studio
 
+## Environment
 
-Visual Studio EXtensions
--Dart 
--Flutter 
--Gradle for Java
--Flutter Widget Snippets
+![Environment Image](https://github.com/user-attachments/assets/e17518ef-42a3-4c30-b7e3-880d93360206)
 
-Database 
--Mysql 
+## Android Studio
 
+- Android Emulator
+- Android SDK Build-Tools 36-rc1
+- Android SDK Commandline Tools
+- Android SDK Platform Tools
+- Android Emulator Hypervisor Driver (installed)
+
+![Android Studio Image 1](https://github.com/user-attachments/assets/ee55247c-deb7-434e-9e8e-b1c9ea6c0188)
+![Android Studio Image 2](https://github.com/user-attachments/assets/065ea24b-75f0-4e34-b2e7-6f83aa12e931)
+
+## Visual Studio Extensions
+
+- Dart
+- Flutter
+- Gradle for Java
+- Flutter Widget Snippets
+
+## Database
+
+### MySQL Setup
+
+```sql
 CREATE DATABASE hiwmai;
 USE hiwmai;
+```
 
-*Table product
+### Tables
+
+#### Table: product
+
+```sql
 CREATE TABLE product (
     id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(255),
@@ -32,11 +53,16 @@ CREATE TABLE product (
     productName VARCHAR(255),
     productDescription TEXT,
     price DECIMAL(10, 2),
+    shipping DECIMAL(10, 2),
+    carry DECIMAL(10, 2),
     imageUrl LONGBLOB,
     postedDate DATETIME
 );
+```
 
-*TABLE users
+#### Table: users
+
+```sql
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     firebase_uid VARCHAR(255),
@@ -49,14 +75,16 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+```
 
-*TABLE recipients
+#### Table: recipients
+
+```sql
 CREATE TABLE recipients (
     id INT AUTO_INCREMENT PRIMARY KEY,
     firebase_uid VARCHAR(255),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
-    account_type ENUM('บุคคลทั่วไป', 'นิติบุคคลภายในประเทศ'),
     title ENUM('นางสาว', 'นาย', 'นาง'),
     gender ENUM('ชาย', 'หญิง', 'ไม่ระบุเพศ'),
     birth_date DATE,
@@ -67,35 +95,41 @@ CREATE TABLE recipients (
     bank_name ENUM('กรุงไทย', 'กรุงเทพ', 'กสิกรไทย', 'ไทยพาณิชย์', 'ธนชาต', 'ออมสิน'),
     account_name VARCHAR(100),
     account_number VARCHAR(50),
-    tax_id VARCHAR(50),
-    id_card_image LONGBLOB,
-    vat_registered TINYINT(1),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+```
 
-*TABLE favorites
+#### Table: favorites
+
+```sql
 CREATE TABLE favorites (
     email VARCHAR(255),
     product_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (email, product_id)
 );
+```
 
-*TABLE admins
+#### Table: admins
+
+```sql
 CREATE TABLE admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+```
 
-*TABLE payment
+#### Table: payment
+
+```sql
 CREATE TABLE payment (
-    id INT AUTO_INCREMENT PRIMARY KEY, 
-    email VARCHAR(255), 
-    income DECIMAL(10, 2), 
-    datepay TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255),
+    income DECIMAL(10, 2),
+    datepay TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reference_number VARCHAR(20),
     FOREIGN KEY (email) REFERENCES users(email)
 );
@@ -123,3 +157,77 @@ BEGIN
 END $$
 
 DELIMITER ;
+```
+
+#### Table: orders
+
+```sql
+CREATE TABLE IF NOT EXISTS orders (
+    ref VARCHAR(20) NOT NULL PRIMARY KEY,
+    email VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(20) NOT NULL,
+    total DECIMAL(10, 2) NOT NULL,
+    shopdate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    qrcode LONGBLOB,
+    image LONGBLOB,
+    paydate TIMESTAMP NULL DEFAULT NULL,
+    status VARCHAR(20),
+    num INT NOT NULL,
+    note VARCHAR(255),
+    CONSTRAINT fk_email FOREIGN KEY (email) REFERENCES users(email)
+);
+
+DELIMITER $$
+
+CREATE TRIGGER trg_generate_order_ref BEFORE INSERT ON orders
+FOR EACH ROW
+BEGIN
+    DECLARE new_ref VARCHAR(20);
+    SET new_ref = CONCAT('ORD', DATE_FORMAT(NOW(), '%Y%m%d'), LPAD(IFNULL(
+        (SELECT MAX(CAST(SUBSTRING(ref, 12) AS UNSIGNED)) FROM orders WHERE SUBSTRING(ref, 4, 8) = DATE_FORMAT(NOW(), '%Y%m%d')), 0) + 1, 4, '0'));
+    SET NEW.ref = new_ref;
+END $$
+
+DELIMITER ;
+```
+
+#### Table: chats
+
+```sql
+CREATE TABLE chats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_email VARCHAR(255) NOT NULL,
+    receiver_email VARCHAR(255) NOT NULL,
+    message TEXT,
+    image_url TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Table: reviews
+
+```sql
+CREATE TABLE reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ref VARCHAR(20) NOT NULL, 
+    email VARCHAR(255) NOT NULL, 
+    rate TINYINT NOT NULL CHECK (rate BETWEEN 1 AND 5), 
+    description VARCHAR(255), 
+    FOREIGN KEY (email) REFERENCES users(email) ON DELETE CASCADE -- FK 
+);
+```
+
+
+#### Table: purchase
+
+```sql
+CREATE TABLE purchase (
+    ref VARCHAR(20) NOT NULL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    trackingnumber varchar(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    confirm_order tinyint(1)
+);
+```
