@@ -47,10 +47,10 @@ Future<void> _fetchUserData() async {
         }
       });
     } else {
-      print("Failed to load profile data");
+
     }
   } catch (e) {
-    print("Error fetching profile data: $e");
+
   }
 }
 

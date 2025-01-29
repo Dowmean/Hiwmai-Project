@@ -26,7 +26,7 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
   Future<void> fetchCategoryProducts() async {
     try {
       final response = await http.get(Uri.parse('$apiUrl${widget.category}'));
-      print("API Response: ${response.body}"); // Debugging
+      //print("API Response: ${response.body}"); // Debugging
       if (response.statusCode == 200) {
         setState(() {
           products = json.decode(response.body);
@@ -36,7 +36,7 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
         throw Exception('Failed to load products');
       }
     } catch (e) {
-      print("Error fetching products: $e");
+      //print("Error fetching products: $e");
       setState(() {
         isLoading = false;
       });
@@ -111,7 +111,7 @@ product['profilePicture'] != null && product['profilePicture'].isNotEmpty
         backgroundImage: NetworkImage(product['profilePicture']),
         radius: 16,
         onBackgroundImageError: (exception, stackTrace) {
-          print("Error loading profile picture: $exception");
+          //print("Error loading profile picture: $exception");
         },
       )
     : CircleAvatar(

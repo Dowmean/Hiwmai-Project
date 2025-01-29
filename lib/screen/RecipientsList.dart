@@ -25,14 +25,14 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('Fetched recipients: $data'); // Debug ข้อมูลที่ได้จาก API
+        //print('Fetched recipients: $data'); // Debug ข้อมูลที่ได้จาก API
         return data;
       } else {
-        print('Failed to fetch recipients: ${response.body}');
+        //print('Failed to fetch recipients: ${response.body}');
         throw Exception('Failed to fetch recipients');
       }
     } catch (e) {
-      print('Error fetching recipients: $e');
+      //print('Error fetching recipients: $e');
       throw Exception('Error fetching recipients');
     }
   }
@@ -52,17 +52,17 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
                         profilePictureUrl) // ใช้ NetworkImage แทน MemoryImage
                     : AssetImage('assets/default_profile.png') as ImageProvider,
             onBackgroundImageError: (exception, stackTrace) {
-              print('Error loading profile picture: $exception');
+              //print('Error loading profile picture: $exception');
             },
           ),
           title: Text(recipient['firstName'] ?? 'Unknown'),
           onTap: () {
-            print('Selected firebaseUid: ${recipient['firebaseUid']}');
+            //print('Selected firebaseUid: ${recipient['firebaseUid']}');
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => RecipientDetailPage(
-                  firebaseUid: recipient['firebaseUid'],
+                  firebaseUid: recipient['firebaseUid'], endpoint: '',
                 ),
               ),
             );

@@ -47,7 +47,7 @@ void _connectToSocket() {
   });
 
   socket.onConnect((_) {
-    print('Connected to server');
+    //print('Connected to server');
     socket.emit('joinRoom', {
       'sender': FirebaseAuth.instance.currentUser!.email,
       'receiver': widget.receiverEmail,
@@ -80,10 +80,10 @@ Future<void> _fetchReceiverDetails() async {
         });
       }
     } else {
-      print('Failed to fetch receiver details: ${response.statusCode}');
+      //print('Failed to fetch receiver details: ${response.statusCode}');
     }
   } catch (e) {
-    print('Error fetching receiver details: $e');
+    //print('Error fetching receiver details: $e');
   }
 }
 
@@ -108,10 +108,10 @@ Future<void> _fetchChatMessages() async {
         });
       }
     } else {
-      print("Failed to fetch chat messages: ${response.body}");
+      //print("Failed to fetch chat messages: ${response.body}");
     }
   } catch (e) {
-    print("Error fetching chat messages: $e");
+    //print("Error fetching chat messages: $e");
   }
 }
 
@@ -175,10 +175,10 @@ void _sendMessageWithImage(String base64Image) async {
         'timestamp': DateTime.now().toString(),
       });
     } else {
-      print('Failed to send image: ${response.body}');
+      //print('Failed to send image: ${response.body}');
     }
   } catch (e) {
-    print('Error sending image: $e');
+    //print('Error sending image: $e');
   }
 }
 
@@ -210,10 +210,10 @@ void _sendMessage(String text) async {
     );
 
     if (response.statusCode != 200) {
-      print('Failed to send message: ${response.body}');
+      //print('Failed to send message: ${response.body}');
     }
   } catch (e) {
-    print('Error sending message: $e');
+    //print('Error sending message: $e');
   }
 
   _messageController.clear(); // ล้างช่องข้อความ
@@ -248,7 +248,7 @@ Widget _buildMessageBubble(Map<String, dynamic> message, bool isSender) {
                       message['imageUrl'],
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        print("Error loading image URL: ${message['imageUrl']}, Error: $error");
+                        //print("Error loading image URL: ${message['imageUrl']}, Error: $error");
                         return Icon(Icons.broken_image);
                       },
                     ),

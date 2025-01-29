@@ -22,7 +22,7 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
 
     // Debug: ตรวจสอบค่า email ที่ส่งเข้ามา
-    print('Email in MainScreen: ${widget.email}');
+    //print('Email in MainScreen: ${widget.email}');
 
     // กำหนดหน้าต่าง ๆ พร้อมส่ง email ไปยัง ProductListPage และ ProfileScreen
     _pages = [

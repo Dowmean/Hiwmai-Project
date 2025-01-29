@@ -1,3 +1,4 @@
+//Recipt
 import 'package:flutter/material.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -59,10 +60,10 @@ Future<void> fetchOrders() async {
       });
     }
   } catch (e) {
-    print('Error fetching to-ship orders: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('เกิดข้อผิดพลาดในการดึงข้อมูลคำสั่งซื้อ')),
-    );
+    //print('Error fetching to-ship orders: $e');
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(content: Text('เกิดข้อผิดพลาดในการดึงข้อมูลคำสั่งซื้อ')),
+    // );
     setState(() {
       isLoading = false;
     });
@@ -160,7 +161,7 @@ String calculateDueDate(String? shopDate) {
       return "กรุณาจัดส่งภายในอีก $days วัน $hours ชั่วโมง $minutes นาที $seconds วินาที";
     }
   } catch (e) {
-    print("Error parsing date: $e");
+    //print("Error parsing date: $e");
     return "วันที่ไม่ถูกต้อง";
   }
 }
@@ -175,11 +176,11 @@ Future<bool> cancelOrder(String orderRef) async {
     if (response.statusCode == 200) {
       return true;
     } else {
-      print('Failed to cancel order: ${response.body}');
+      //print('Failed to cancel order: ${response.body}');
       return false;
     }
   } catch (e) {
-    print('Error canceling order: $e');
+    //print('Error canceling order: $e');
     return false;
   }
 }

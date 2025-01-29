@@ -21,7 +21,7 @@ class ProductService {
         throw Exception('Failed to check role or ownership. Status Code: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error checking role or ownership: $e');
+      //print('Error checking role or ownership: $e');
       throw Exception('Error checking role or ownership: $e');
     }
   }
@@ -46,7 +46,7 @@ class ProductService {
       );
 
       if (response.statusCode == 200) {
-        print('Added to favorites successfully');
+        //print('Added to favorites successfully');
       } else {
         throw Exception('Failed to add to favorites: ${response.body}');
       }
@@ -74,7 +74,7 @@ class ProductService {
       );
 
       if (response.statusCode == 200) {
-        print('Removed from favorites successfully');
+        //print('Removed from favorites successfully');
       } else {
         throw Exception('Failed to remove favorite: ${response.body}');
       }
@@ -85,9 +85,9 @@ class ProductService {
 
   /// **ดึงรายการโปรดด้วยอีเมล**
   Future<List<int>> getFavorites(String email) async {
-    print('Fetching favorites for email: $email');
+    //print('Fetching favorites for email: $email');
     final response = await http.get(Uri.parse('$baseUrl/favorites?email=$email'));
-    print('Favorites response: ${response.body}');
+    //print('Favorites response: ${response.body}');
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -99,7 +99,7 @@ class ProductService {
 
   /// **ดึงข้อมูลสินค้าด้วย IDs**
 Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
-  print('Fetching products for IDs: $productIds');
+  //print('Fetching products for IDs: $productIds');
   try {
     final response = await http.post(
       Uri.parse('$baseUrl/getproduct/fetchByIds'),

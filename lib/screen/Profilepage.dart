@@ -2,13 +2,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/AllOrdersuccessfu.dart';
+import 'package:loginsystem/screen/IncomeRecipient.dart';
 import 'package:loginsystem/screen/OrderHistory.dart';
+import 'package:loginsystem/screen/Orderscancle.dart';
 import 'package:loginsystem/screen/Ownorder.dart';
 import 'package:loginsystem/screen/PaymentComplet.dart';
 import 'package:loginsystem/screen/PendingPayment.dart';
 import 'package:loginsystem/screen/Receiving.dart';
 import 'package:loginsystem/screen/Regisrecipients.dart';
 import 'package:loginsystem/screen/Review.dart';
+import 'package:loginsystem/screen/Setting.dart';
 import 'package:loginsystem/screen/Shipping.dart';
 import 'package:loginsystem/screen/Topay.dart';
 import 'package:loginsystem/screen/UserList.dart';
@@ -29,16 +33,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String email = '';
   String profilePictureUrl = '';
   String? currentUserRole;
+  double totalIncome = 0.0;
+String firstShopDate = '';
+String lastShopDate = '';
+
+
 
   @override
   void initState() {
     super.initState();
     email = user?.email ?? '';
+
     _fetchUserData();
     fetchUserRole(email).then((role) {
       setState(() {
         currentUserRole = role;
       });
+
+    if (role == 'Recipient') {
+      fetchIncomeDetails().then((incomeData) {
+        setState(() {
+          totalIncome = incomeData['totalIncome'];
+          firstShopDate = incomeData['firstShopDate'];
+          lastShopDate = incomeData['lastShopDate'];
+        });
+      });
+    }
     });
   }
 
@@ -56,11 +76,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           birthDate = data['birth_date'] ?? '';
           profilePictureUrl = data['profile_picture'] ?? '';
         });
-      } else {
-        print("Failed to load profile data: ${response.statusCode}");
-      }
+      } 
     } catch (e) {
-      print("Error fetching profile data: $e");
+     
     }
   }
 
@@ -72,14 +90,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final data = json.decode(response.body);
         return data['role'];
       } else {
-        print('Failed to fetch user role: ${response.body}');
+        
         return null;
       }
     } catch (e) {
-      print('Error fetching user role: $e');
+      
       return null;
     }
   }
+
+Future<Map<String, dynamic>> fetchIncomeDetails() async {
+  try {
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:3000/recipients/${user!.uid}/ALLincome'),
+    );
+
+    //print('Response Body: ${response.body}'); // 🛠 Debug ข้อมูล API
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (data is Map<String, dynamic>) {
+        return {
+          'totalIncome': double.tryParse(data['totalIncome'].toString()) ?? 0.0,
+          'firstShopDate': data['firstShopDate'] ?? '',
+          'lastShopDate': data['lastShopDate'] ?? '',
+        };
+      }
+    }
+
+    return {'totalIncome': 0.0, 'firstShopDate': '', 'lastShopDate': ''};
+  } catch (e) {
+    //print('Error fetching income data: $e');
+    return {'totalIncome': 0.0, 'firstShopDate': '', 'lastShopDate': ''};
+  }
+}
+
+
+
 
 Widget _displayProfileImage() {
   if (profilePictureUrl.isNotEmpty) {
@@ -87,7 +135,7 @@ Widget _displayProfileImage() {
       radius: 35,
       backgroundImage: NetworkImage(profilePictureUrl),
       onBackgroundImageError: (exception, stackTrace) {
-        print('Error loading profile picture: $exception');
+        
       },
     );
   } else {
@@ -144,62 +192,104 @@ Widget _buildOrderStatusTileWithIcon(
   );
 }
 
+String formatDate(String isoDate) {
+  if (isoDate.isEmpty) return "ไม่พบข้อมูลวันที่";
+  
+  DateTime date = DateTime.parse(isoDate);
+  List<String> monthNames = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  
+  return "${date.day} ${monthNames[date.month - 1]} ${date.year}";
+}
 
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.pink,
-        elevation: 0,
-      ),
-      body: currentUserRole == null
-          ? Center(child: CircularProgressIndicator())
-          : ListView(
-              children: [
-                Container(
-                  color: Colors.pink,
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      _displayProfileImage(),
-                      SizedBox(width: 20),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            username,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProfilesettingScreen(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'แก้ไขโปรไฟล์',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                decoration: TextDecoration.underline,
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      backgroundColor: Colors.pink,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+    ),
+    body: currentUserRole == null
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            children: [
+              // ✅ ใช้ Stack เพื่อให้ Positioned ทำงานได้
+              Stack(
+                children: [
+                  // 🔹 โปรไฟล์ผู้ใช้
+                  Container(
+                    color: Colors.pink,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        _displayProfileImage(),
+                        const SizedBox(width: 20),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              username,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ProfilesettingScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'แก้ไขโปรไฟล์',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                
-                Divider(),
-                             // แสดงส่วน "สถานะคำสั่งซื้อ" สำหรับทุกบทบาท
+                  // ✅ ไอคอน Settings ที่มุมขวาบน
+                  Positioned(
+                    right: 10, // ระยะห่างจากขอบขวา
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SettingScreen()),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.3), // สีพื้นหลังโปร่งแสง
+                        ),
+                        child: const Icon(
+                          Icons.settings,
+                          size: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const Divider(),
+
+              // 🔹 ส่วนของ "สถานะคำสั่งซื้อ"
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(
@@ -208,19 +298,16 @@ Widget _buildOrderStatusTileWithIcon(
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'สถานะคำสั่งซื้อ',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         GestureDetector(
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                  builder: (context) => OrderHistoryPage()),
+                              MaterialPageRoute(builder: (context) => OrderHistoryPage()),
                             );
-                            
                           },
                           child: Text(
                             'ดูประวัติคำสั่งซื้อ >',
@@ -248,7 +335,7 @@ if (currentUserRole == 'Admin') ...[
     mainAxisAlignment: MainAxisAlignment.center, // จัดตำแหน่งให้อยู่ตรงกลาง
     
     children: [
-      SizedBox(width: 30),
+      SizedBox(width: 20),
       // เมนู "ยังไม่ชำระ"
       _buildMenuIcon(
         context,
@@ -261,20 +348,6 @@ if (currentUserRole == 'Admin') ...[
           );
         },
       ),
-      SizedBox(width: 30), // เพิ่มระยะห่างระหว่างไอคอน
-      // เมนู "ชำระเงินเสร็จ"
-      // _buildMenuIcon(
-      //   context,
-      //   icon: Icons.done_all,
-      //   label: 'ชำระเงินสำเร็จ',
-      //   onTap: () {
-      //     Navigator.push(
-      //       context,
-      //       MaterialPageRoute(builder: (context) => PaymentCompletedPage()),
-      //     );
-      //   },
-      // ),
-      SizedBox(width: 10),
       _buildMenuIcon(
         context,
         icon: Icons.done_all,
@@ -282,11 +355,10 @@ if (currentUserRole == 'Admin') ...[
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => PaymentCompletedPage()),
+            MaterialPageRoute(builder: (context) => SuccessAndReviewPage(userEmail: '',)),
           );
         },
       ),
-      SizedBox(width: 10),
       _buildMenuIcon(
         context,
         icon: Icons.done_all,
@@ -298,6 +370,19 @@ if (currentUserRole == 'Admin') ...[
           );
         },
       ),
+      //เมนู "ยกเลิก"
+      _buildMenuIcon(
+        context,
+        icon: Icons.done_all,
+        label: 'ยกเลิก',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => OrdersCancelPage()),
+          );
+        },
+      ),
+
     ],
   ),
 
@@ -358,53 +443,70 @@ if (currentUserRole == 'User')
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // เมนู "ที่ต้องชำระ"
-            _buildMenuIcon(
-              context,
-              icon: Icons.list_alt,
-              label: 'ที่ต้องชำระ',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => PendingPaymentPage(userEmail: '',)),
-                );
-              },
-            ),
-            // เมนู "รอจัดส่ง"
-            _buildMenuIcon(
-              context,
-              icon: Icons.local_shipping,
-              label: 'รอจัดส่ง',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ShippingPage()),
-                );
-              },
-            ),
-            // เมนู "ที่ต้องได้รับ"
-            _buildMenuIcon(
-              context,
-              icon: Icons.inbox,
-              label: 'ที่ต้องได้รับ',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ReceivingPage()),
-                );
-              },
-            ),
-            // เมนู "ให้คะแนน"
-            _buildMenuIcon(
-              context,
-              icon: Icons.star_border,
-              label: 'ให้คะแนน',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ReviewPage()),
-                );
-              },
-            ),
+_buildMenuIcon(
+  context,
+  icon: Icons.list_alt,
+  label: 'ที่ต้องชำระ',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PendingPaymentPage(
+          userEmail: '', // ใส่อีเมลของผู้ใช้
+          initialTabIndex: 0, // Tab "ที่ต้องชำระ"
+        ),
+      ),
+    );
+  },
+),
+_buildMenuIcon(
+  context,
+  icon: Icons.local_shipping,
+  label: 'กำลังจัดส่ง',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PendingPaymentPage(
+          userEmail: '', // ใส่อีเมลของผู้ใช้
+          initialTabIndex: 1, // Tab "รอจัดส่ง"
+        ),
+      ),
+    );
+  },
+),
+_buildMenuIcon(
+  context,
+  icon: Icons.inbox,
+  label: 'สำเร็จ',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PendingPaymentPage(
+          userEmail: '', // ใส่อีเมลของผู้ใช้
+          initialTabIndex: 2, // Tab "ที่ต้องได้รับ"
+        ),
+      ),
+    );
+  },
+),
+_buildMenuIcon(
+  context,
+  icon: Icons.star_border,
+  label: 'คะแนน',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PendingPaymentPage(
+          userEmail: '', // ใส่อีเมลของผู้ใช้
+          initialTabIndex: 3, // Tab "ให้คะแนน"
+        ),
+      ),
+    );
+  },
+),
           ],
         ),
         Divider(),
@@ -486,7 +588,67 @@ Row(
       'ให้คะแนน',
       ReviewPage(), // หน้าปลายทาง
     ),
+
+
   ],
+),
+SizedBox(height: 20), // เพิ่มระยะห่าง
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  child: GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => IncomeRecipient(firebaseUid: user!.uid, endpoint: '',),
+        ),
+      );
+    },
+    child: Container(
+      width: double.infinity, // ขยายเต็มจอ
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 2,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center, // ✅ จัดให้อยู่ตรงกลางแนวนอน
+        mainAxisAlignment: MainAxisAlignment.center,  // ✅ จัดให้อยู่ตรงกลางแนวตั้ง
+        children: [
+          Text(
+            'รายได้ของฉัน',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center, // ✅ จัดให้ตรงกลาง
+          ),
+          SizedBox(height: 5),
+          Text(
+            (firstShopDate.isNotEmpty && lastShopDate.isNotEmpty)
+                ? '${formatDate(firstShopDate)} - ${formatDate(lastShopDate)}'
+                : 'ไม่พบข้อมูลวันที่',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+            textAlign: TextAlign.center, // ✅ จัดให้ตรงกลาง
+          ),
+          SizedBox(height: 10),
+          Text(
+            '${totalIncome.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: totalIncome > 0 ? Colors.pink : Colors.grey,
+            ),
+            textAlign: TextAlign.center, // ✅ จัดให้ตรงกลาง
+          ),
+        ],
+      ),
+    ),
+  ),
 ),
 
 

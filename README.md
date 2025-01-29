@@ -3,11 +3,13 @@
 ## Install
 - Tools:
   - Dart 3.5.4
+  - Flutter 3.27.3 
   - DevTools 2.37.3
   - JDK: jdk-17.0.12
   - JavaScript: v22.11.0
 - Android Studio
 - Visual Studio
+- MySQL
 
 ## Environment
 

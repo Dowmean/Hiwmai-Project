@@ -33,17 +33,17 @@ class _ProfileViewState extends State<ProfileView> {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('API Response (Profile): ${response.body}'); // Debug
+        //print('API Response (Profile): ${response.body}'); // Debug
 
         setState(() {
           username = data['username'] ?? 'ไม่ทราบชื่อ';
           profilePictureUrl = data['profile_picture'] ?? '';
         });
       } else {
-        print('Failed to fetch user profile: ${response.body}');
+        //print('Failed to fetch user profile: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching user profile: $e');
+      //print('Error fetching user profile: $e');
     } finally {
       setState(() {
         isLoading = false;
@@ -56,23 +56,23 @@ class _ProfileViewState extends State<ProfileView> {
         'http://10.0.2.2:3000/postsByUser?email=${widget.email}';
 
     try {
-      print('Fetching posts for email: ${widget.email}'); // Debug email
+      //print('Fetching posts for email: ${widget.email}'); // Debug email
       final response = await http.get(Uri.parse(apiUrl));
-      print('API Response Code: ${response.statusCode}'); // Debug status code
-      print('API Response Body: ${response.body}'); // Debug raw response
+      //print('API Response Code: ${response.statusCode}'); // Debug status code
+      //print('API Response Body: ${response.body}'); // Debug raw response
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('Parsed Data: $data'); // Debug parsed data
+        //print('Parsed Data: $data'); // Debug parsed data
 
         setState(() {
           userPosts = data;
         });
       } else {
-        print('Failed to fetch user posts: ${response.body}');
+        //print('Failed to fetch user posts: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching user posts: $e');
+      //print('Error fetching user posts: $e');
     }
   }
 
@@ -82,7 +82,7 @@ Widget _displayProfileImage() {
       radius: 50,
       backgroundImage: NetworkImage(profilePictureUrl),
       onBackgroundImageError: (exception, stackTrace) {
-        print('Error loading profile picture: $exception');
+        //print('Error loading profile picture: $exception');
       },
       child: Icon(Icons.person), // เพิ่มไอคอนเริ่มต้นหากโหลดไม่ได้
     );
@@ -132,7 +132,7 @@ Widget _buildPostCard(dynamic post) {
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      print('Error loading product image: $error');
+                      //print('Error loading product image: $error');
                       return Container(
                         height: 150,
                         color: Colors.grey[200],

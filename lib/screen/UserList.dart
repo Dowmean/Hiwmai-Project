@@ -43,7 +43,7 @@ class _UserListPageState extends State<UserListPage> {
   itemBuilder: (context, index) {
     final user = users[index];
     final profilePictureUrl = user['profile_picture'];
-    print('Profile Picture URL: $profilePictureUrl'); // Debug URL
+    //print('Profile Picture URL: $profilePictureUrl'); // Debug URL
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -56,7 +56,7 @@ CircleAvatar(
       : null,
   onBackgroundImageError: profilePictureUrl != null && profilePictureUrl.isNotEmpty
       ? (exception, stackTrace) {
-          print('Error loading profile picture: $exception');
+          //print('Error loading profile picture: $exception');
         }
       : null, // Don't use onBackgroundImageError if backgroundImage is null
   child: profilePictureUrl == null || profilePictureUrl.isEmpty

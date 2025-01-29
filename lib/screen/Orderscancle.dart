@@ -1,47 +1,48 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/Refund.dart';
 import 'dart:convert';
 
-class PaymentCompletedPage extends StatefulWidget {
+class OrdersCancelPage extends StatefulWidget {
   @override
-  _PaymentCompletedPageState createState() => _PaymentCompletedPageState();
+  _OrdersCancelPageState createState() => _OrdersCancelPageState();
 }
 
-class _PaymentCompletedPageState extends State<PaymentCompletedPage> {
-  List<dynamic> orders = [];
+class _OrdersCancelPageState extends State<OrdersCancelPage> {
+  List<dynamic> canceledOrders = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchPaymentCompletedOrders();
+    fetchCanceledOrders();
   }
 
-  Future<void> fetchPaymentCompletedOrders() async {
+  Future<void> fetchCanceledOrders() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/TranfercompletedOrders'),
+        Uri.parse('http://10.0.2.2:3000/OrderscancleAdmin'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          orders = data['orders'];
+          canceledOrders = data['orders'];
           isLoading = false;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch payment completed orders.')),
+          SnackBar(content: Text('ไม่พบคำสั่งซื้อที่ถูกยกเลิก')),
         );
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
-      //print('Error fetching payment completed orders: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while fetching orders.')),
-      // );
+      //print('Error fetching canceled orders: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล')),
+      );
       setState(() {
         isLoading = false;
       });
@@ -54,19 +55,33 @@ class _PaymentCompletedPageState extends State<PaymentCompletedPage> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
-        title: Text('ทำการจ่ายเรียบร้อยแล้ว', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(
+          'คำสั่งซื้อที่ถูกยกเลิก',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
-          : orders.isEmpty
-              ? Center(child: Text('No payment completed orders available.'))
+          : canceledOrders.isEmpty
+              ? Center(child: Text('ไม่มีคำสั่งซื้อที่ถูกยกเลิก'))
               : ListView.builder(
-                  itemCount: orders.length,
+                  itemCount: canceledOrders.length,
                   itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return OrderCard(order: order);
+                    final order = canceledOrders[index];
+                    return OrderCard(
+                      order: order,
+                      onNavigateRefund: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RefundPage(
+                            ),
+                          ),
+                        );
+                      },
+                    );
                   },
                 ),
     );
@@ -75,8 +90,9 @@ class _PaymentCompletedPageState extends State<PaymentCompletedPage> {
 
 class OrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
+  final VoidCallback onNavigateRefund;
 
-  const OrderCard({required this.order});
+  const OrderCard({required this.order, required this.onNavigateRefund});
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +117,8 @@ class OrderCard extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  "สำเร็จ",
-                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                  "ถูกยกเลิก",
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -115,7 +131,7 @@ class OrderCard extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              order['productName'] ?? 'No product name',
+              order['productName'] ?? 'ไม่มีชื่อสินค้า',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             Row(
@@ -138,6 +154,18 @@ class OrderCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onNavigateRefund,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pink,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text("คืนเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],
         ),

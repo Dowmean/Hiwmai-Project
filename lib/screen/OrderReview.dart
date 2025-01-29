@@ -59,7 +59,7 @@ class _OrderReviewState extends State<OrderReview> {
         );
       }
     } catch (e) {
-      print('Error submitting review: $e');
+      //print('Error submitting review: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An error occurred while submitting the review.')),
       );

@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:loginsystem/screen/Transfer.dart';
 
-class RecipientDetailPage extends StatelessWidget {
+class  IncomeRecipient extends StatelessWidget {
   final String firebaseUid;
   final String endpoint;
 
-  const RecipientDetailPage({
+  const  IncomeRecipient({
     Key? key,
     required this.firebaseUid,
     required this.endpoint,
@@ -15,9 +15,12 @@ class RecipientDetailPage extends StatelessWidget {
 
 Future<Map<String, dynamic>> fetchIncomeData() async {
   try {
-    final response = await http
-        .get(Uri.parse('http://10.0.2.2:3000/recipients/$firebaseUid/$endpoint'))
-        .timeout(Duration(seconds: 10));
+    //print('Fetching data for UID: $firebaseUid'); // Debug UID ที่ใช้เรียก API
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:3000/recipients/$firebaseUid/$endpoint'),
+    );
+
+    //print('Response Body for UID: $firebaseUid => ${response.body}'); // Debug Response
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -25,12 +28,13 @@ Future<Map<String, dynamic>> fetchIncomeData() async {
         return data;
       }
     }
-    return {}; // ส่งค่า empty map หาก response ไม่ใช่ 200 หรือ data ไม่ถูกต้อง
+    return {}; // ถ้าไม่มีข้อมูลให้คืนค่าเป็น empty
   } catch (e) {
     //print('Error fetching income data: $e');
-    return {}; // ส่งค่า empty map ในกรณีมีข้อผิดพลาด
+    return {};
   }
 }
+
 
 
 @override
@@ -63,7 +67,7 @@ Widget build(BuildContext context) {
               
               automaticallyImplyLeading: false,
               centerTitle: true,
-              title: Text('รายละเอียดข้อมูลการชำระเงิน'),
+              title: Text('รายได้ของฉัน'),
               bottom: TabBar(
           labelColor: Colors.pink,
           unselectedLabelColor: Colors.grey,
@@ -179,7 +183,7 @@ class IncomeTab extends StatelessWidget {
     }
     return {}; // ส่งค่า empty map หาก response ไม่ใช่ 200 หรือ data ไม่ถูกต้อง
   } catch (e) {
-    //('Error fetching income data: $e');
+    //print('Error fetching income data: $e');
     return {}; // ส่งค่า empty map ในกรณีมีข้อผิดพลาด
   }
 }

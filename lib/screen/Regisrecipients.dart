@@ -40,7 +40,7 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
     setState(() {
       _firebaseUid = user?.uid;
     });
-    print("Firebase UID: $_firebaseUid"); // Debug: ตรวจสอบค่า firebase_uid
+    //print("Firebase UID: $_firebaseUid"); // Debug: ตรวจสอบค่า firebase_uid
   }
 
   @override
@@ -170,7 +170,7 @@ final data = {
   "bankName": _bankNameController.text,
   "accountName": _accountNameController.text,
   "accountNumber": _accountNumberController.text
-};print(data); // ตรวจสอบว่าข้อมูลครบถ้วนก่อนส่งออก
+};//print(data); // ตรวจสอบว่าข้อมูลครบถ้วนก่อนส่งออก
 
 
 
@@ -201,13 +201,11 @@ final data = {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text("แก้ไขข้อมูลส่วนตัว"),
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

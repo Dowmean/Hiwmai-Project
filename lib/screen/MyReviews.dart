@@ -10,20 +10,20 @@ class MyReviewsPage extends StatelessWidget {
 
   Future<Map<String, dynamic>> fetchReviewDetails() async {
     try {
-      print('Fetching details for email: $userEmail, orderRef: $orderRef');
+      //print('Fetching details for email: $userEmail, orderRef: $orderRef');
       final response = await http.get(
         Uri.parse('http://10.0.2.2:3000/getReviewDetails?email=$userEmail&orderRef=$orderRef'),
       );
 
       if (response.statusCode == 200) {
-        print('Response data: ${response.body}');
+        //print('Response data: ${response.body}');
         return json.decode(response.body);
       } else {
-        print('Failed with status: ${response.statusCode}');
+        //print('Failed with status: ${response.statusCode}');
         throw Exception('Failed to fetch review details');
       }
     } catch (e) {
-      print('Error fetching review details: $e');
+      //print('Error fetching review details: $e');
       throw Exception('Error fetching review details: $e');
     }
   }

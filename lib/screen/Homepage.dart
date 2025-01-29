@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'ProductCategory.dart'; // Import for the category page
 import 'ProductDetailPage.dart'; // Import for the product detail page
 import 'ChatList.dart';
+import 'package:loginsystem/screen/Search.dart';
 
 class HomepageScreen extends StatefulWidget {
   @override
@@ -64,8 +65,8 @@ class _HomepageScreenState extends State<HomepageScreen> {
   Future<void> fetchProducts() async {
     try {
       final response = await http.get(Uri.parse(apiUrl));
-      print("API Status Code: ${response.statusCode}");
-      print("API Response Body: ${response.body}");
+      //print("API Status Code: ${response.statusCode}");
+      //print("API Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
         List<dynamic> products = json.decode(response.body);
@@ -74,13 +75,13 @@ class _HomepageScreenState extends State<HomepageScreen> {
           isLoading = false; // Stop loading
         });
       } else {
-        print("Error: Failed to load products");
+        //print("Error: Failed to load products");
         setState(() {
           isLoading = false; // Stop loading on error
         });
       }
     } catch (e) {
-      print("Error fetching products: $e");
+      //print("Error fetching products: $e");
       setState(() {
         isLoading = false; // Stop loading on error
       });
@@ -101,20 +102,30 @@ class _HomepageScreenState extends State<HomepageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'ค้นหา',
-              prefixIcon: Icon(Icons.search),
-              border: InputBorder.none,
-            ),
-          ),
-        ),
+title: GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SearchProductsPage()),
+    );
+  },
+  child: Container(
+    height: 40,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        SizedBox(width: 10),
+        Icon(Icons.search, color: Colors.grey),
+        SizedBox(width: 10),
+        Text("ค้นหาสินค้า...", style: TextStyle(color: Colors.grey)),
+      ],
+    ),
+  ),
+),
+
         backgroundColor: Colors.pink,
         actions: [
           IconButton(
@@ -250,7 +261,7 @@ CircleAvatar(
       ? NetworkImage(product['profilePicture'])
       : null,
   onBackgroundImageError: (exception, stackTrace) {
-    print("Error loading profile picture: $exception");
+    //print("Error loading profile picture: $exception");
   },
   child: product['profilePicture'] == null
       ? Icon(Icons.person)

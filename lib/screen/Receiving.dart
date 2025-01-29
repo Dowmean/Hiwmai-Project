@@ -46,18 +46,12 @@ class _ReceivingPageState extends State<ReceivingPage> with SingleTickerProvider
           isLoading = false;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch completed orders')),
-        );
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
-      print('Error fetching completed orders: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching completed orders')),
-      );
+      ;
       setState(() {
         isLoading = false;
       });

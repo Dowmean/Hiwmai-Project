@@ -47,15 +47,12 @@ class _ShippingPageState extends State<ShippingPage>
           isLoading = false;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch shipping orders')),
-        );
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
-      print('Error fetching shipping orders: $e');
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching shipping orders')),
       );

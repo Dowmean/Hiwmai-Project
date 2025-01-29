@@ -57,10 +57,10 @@ Future<void> _fetchProduct() async {
         total = (price * quantity) + shipping + carry;
       });
     } else {
-      print('Failed to fetch product: ${response.body}');
+      //print('Failed to fetch product: ${response.body}');
     }
   } catch (e) {
-    print('Error fetching product: $e');
+    //print('Error fetching product: $e');
   }
 }
 

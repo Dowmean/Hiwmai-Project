@@ -12,14 +12,15 @@ dependencies:
   shared_preferences: ^2.0.13
   form_field_validator: ^1.1.0
   cupertino_icons: ^1.0.2
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
+  firebase_core: ^3.10.1
+  firebase_auth: ^5.4.1
   firebase_admin: ^0.3.0
+  firebase_app_check: ^0.3.2+1
   dart_firebase_admin: ^0.4.0
   fluttertoast: ^8.2.8
   flutter_image_compress: ^2.3.0
-  cloud_firestore: ^5.4.4 
-  firebase_storage: ^12.3.3 
+  cloud_firestore: ^5.6.2
+  firebase_storage: ^12.4.1
   image_picker: ^1.1.2 
   image: ^4.3.0
   mysql1: ^0.20.0
@@ -28,6 +29,7 @@ dependencies:
   cached_network_image: ^3.4.1
   socket_io_client: ^3.0.2
   path_provider: ^2.1.5
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
@@ -42,3 +44,9 @@ flutter:
     - assets/images/carousel2.png
     - assets/images/default_profile.png
     - assets/images/bankqr.jpg
+    - assets/banks/
+    - assets/banks/ktb.png
+    - assets/banks/scb.png
+    - assets/banks/kbank.png
+    - assets/banks/bbl.png
+

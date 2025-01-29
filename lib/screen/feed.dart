@@ -46,10 +46,10 @@ class _ProductFeedScreenState extends State<ProductFeedScreen> {
           profilePictureUrl = data['profile_picture'] ?? '';
         });
       } else {
-        print("Failed to load profile data: ${response.statusCode}");
+        //print("Failed to load profile data: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error fetching profile data: $e");
+      //print("Error fetching profile data: $e");
     }
   }
 
@@ -68,10 +68,10 @@ class _ProductFeedScreenState extends State<ProductFeedScreen> {
           currentUserRole = data['role'];
         });
       } else {
-        print("Failed to fetch user role: ${response.body}");
+        //print("Failed to fetch user role: ${response.body}");
       }
     } catch (e) {
-      print("Error fetching user role: $e");
+      //print("Error fetching user role: $e");
     }
   }
 
@@ -116,7 +116,7 @@ Widget _displayProfileImage() {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SearchScreen()),
+                  MaterialPageRoute(builder: (context) => SearchProductsPage ()),
                 );
               },
               child: Container(

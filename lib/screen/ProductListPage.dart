@@ -32,9 +32,9 @@ class _ProductListPageState extends State<ProductListPage> {
       setState(() {
         email = user.email ?? '';
       });
-      print('User email: $email');
+      //print('User email: $email');
     } else {
-      print('No user is currently logged in.');
+      //print('No user is currently logged in.');
     }
   }
 
@@ -44,32 +44,32 @@ Future<void> _fetchFavorites() async {
       _favoriteProducts =
           ProductService().getFavorites(email).then((favoriteIds) {
         final uniqueIds = favoriteIds.toSet().toList();
-        print('Favorite IDs: $uniqueIds');
+        //print('Favorite IDs: $uniqueIds');
 
         if (uniqueIds.isEmpty) return Future.value([]);
 
         return ProductService()
             .fetchProductsByIds(uniqueIds)
             .then((products) {
-          print('Fetched products: $products');
+          //print('Fetched products: $products');
 
           // ตรวจสอบค่า imageUrl ใน products
           products.forEach((product) {
-            print('Product image URL: ${product['imageUrl']}');
+            //print('Product image URL: ${product['imageUrl']}');
           });
 
           return products;
         }).catchError((e) {
-          print('Error fetching products: $e');
+          //print('Error fetching products: $e');
           return [];
         });
       }).catchError((e) {
-        print('Error fetching favorites: $e');
+        //print('Error fetching favorites: $e');
         return [];
       });
     });
   } else {
-    print('No email found, skipping fetch.');
+    //print('No email found, skipping fetch.');
     setState(() {
       _favoriteProducts = Future.value([]);
     });
@@ -103,7 +103,7 @@ Widget _buildProductImage(dynamic imageUrl) {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        print('Error loading image: $error');
+        //print('Error loading image: $error');
         return Container(
           color: Colors.grey[200],
           height: 120,
@@ -112,7 +112,7 @@ Widget _buildProductImage(dynamic imageUrl) {
       },
     );
   } catch (e) {
-    print('Unexpected error loading image: $e');
+    //print('Unexpected error loading image: $e');
     return Container(
       color: Colors.grey[200],
       height: 120,

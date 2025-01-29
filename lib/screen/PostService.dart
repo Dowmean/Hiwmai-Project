@@ -35,7 +35,7 @@ Map<String, dynamic> postData = {
 
 
     try {
-      print("Sending data: ${json.encode(postData)}");
+      //print("Sending data: ${json.encode(postData)}");
 
       var response = await http.post(
         Uri.parse(apiUrl),
@@ -45,12 +45,12 @@ Map<String, dynamic> postData = {
 
       // Handle response
       if (response.statusCode == 201) {
-        print("Post created successfully: ${response.body}");
+        //print("Post created successfully: ${response.body}");
       } else {
-        print("Failed to create post: ${response.statusCode}, ${response.body}");
+        //print("Failed to create post: ${response.statusCode}, ${response.body}");
       }
     } catch (e) {
-      print("Error submitting post: $e");
+      //print("Error submitting post: $e");
     }
   }
 
@@ -84,7 +84,7 @@ Future<bool> editPost(
 
   try {
     final String apiUrl = 'http://10.0.2.2:3000/editpost/$id';
-    print("Sending data to backend: $postData");
+    //print("Sending data to backend: $postData");
 
     var response = await http.put(
       Uri.parse(apiUrl),
@@ -93,14 +93,14 @@ Future<bool> editPost(
     );
 
     if (response.statusCode == 200) {
-      print("Post updated successfully: ${response.body}");
+      //print("Post updated successfully: ${response.body}");
       return true;
     } else {
-      print("Failed to update post: ${response.statusCode}, ${response.body}");
+      //print("Failed to update post: ${response.statusCode}, ${response.body}");
       return false;
     }
   } catch (e) {
-    print("Error updating post: $e");
+    //print("Error updating post: $e");
     return false;
   }
 }
@@ -116,14 +116,14 @@ Future<bool> deletePost(int id) async {
     );
 
     if (response.statusCode == 200) {
-      print("Post deleted successfully: ${response.body}");
+      //print("Post deleted successfully: ${response.body}");
       return true;
     } else {
-      print("Failed to delete post: ${response.statusCode}, ${response.body}");
+      //print("Failed to delete post: ${response.statusCode}, ${response.body}");
       return false;
     }
   } catch (e) {
-    print("Error deleting post: $e");
+    //print("Error deleting post: $e");
     return false;
   }
 }
@@ -133,7 +133,7 @@ Future<bool> deletePost(int id) async {
 Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
   final url = Uri.parse('http://10.0.2.2:3000/getproduct/fetchByIds');
   try {
-    print('Fetching products for IDs: $productIds');
+    //print('Fetching products for IDs: $productIds');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -142,14 +142,14 @@ Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
 
     if (response.statusCode == 200) {
       final List<dynamic> products = jsonDecode(response.body);
-      print('Fetched products: $products');
+      //print('Fetched products: $products');
       return products;
     } else {
-      print('Failed to fetch products: ${response.statusCode} - ${response.body}');
+      //print('Failed to fetch products: ${response.statusCode} - ${response.body}');
       throw Exception('Failed to fetch products');
     }
   } catch (e) {
-    print('Error fetching products: $e');
+    //print('Error fetching products: $e');
     throw Exception('Error fetching products: $e');
   }
 }

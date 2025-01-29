@@ -51,10 +51,10 @@ void initState() {
           currentUserRole = data['role'];
         });
       } else {
-        print('Failed to fetch user role: ${response.body}');
+        //print('Failed to fetch user role: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching user role: $e');
+      //print('Error fetching user role: $e');
     }
   }
 Future<void> _fetchProductDetails() async {
@@ -72,10 +72,10 @@ Future<void> _fetchProductDetails() async {
         };
       });
     } else {
-      print('Failed to fetch product details: ${response.body}');
+      //print('Failed to fetch product details: ${response.body}');
     }
   } catch (e) {
-    print('Error fetching product details: $e');
+    //print('Error fetching product details: $e');
   }
 }
 
@@ -87,9 +87,9 @@ Future<void> _fetchProductDetails() async {
       setState(() {
         email = user.email ?? '';
       });
-      print('Fetched email from Firebase: $email');
+      //print('Fetched email from Firebase: $email');
     } else {
-      print('No user is currently logged in.');
+      //print('No user is currently logged in.');
     }
   }
 
@@ -114,7 +114,7 @@ Future<void> _fetchProductDetails() async {
         throw Exception('Failed to toggle favorite status: ${response.body}');
       }
     } catch (e) {
-      print("Error toggling favorite status: $e");
+      //print("Error toggling favorite status: $e");
       throw Exception('Error toggling favorite status');
     }
   }
@@ -132,10 +132,10 @@ Future<void> _fetchProductDetails() async {
           isFavorite = data.any((fav) => fav['product_id'] == product['id']);
         });
       } else {
-        print('Failed to fetch favorite status: ${response.body}');
+        //print('Failed to fetch favorite status: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching favorite status: $e');
+      //print('Error fetching favorite status: $e');
     }
   }
 
@@ -155,11 +155,11 @@ Future<void> _fetchProductDetails() async {
         final data = json.decode(response.body);
         return data['canEditOrDelete'] == true;
       } else {
-        print('Failed to check role: ${response.body}');
+        //print('Failed to check role: ${response.body}');
         return false;
       }
     } catch (e) {
-      print("Error checking role: $e");
+      //print("Error checking role: $e");
       return false;
     }
   }
@@ -388,7 +388,7 @@ Widget _buildProductImage(String? imageUrl) {
       );
     }
   } catch (e) {
-    print('Error loading image: $e');
+    //print('Error loading image: $e');
     return Container(
       color: Colors.grey[200],
       height: 300,
@@ -410,7 +410,7 @@ Widget _buildProductImage(String? imageUrl) {
         });
       }
     } catch (e) {
-      print('Error picking image: $e');
+      //print('Error picking image: $e');
       return null;
     }
     return null;

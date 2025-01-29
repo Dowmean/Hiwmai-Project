@@ -3,9 +3,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:loginsystem/model/Profile.dart';
+import 'package:loginsystem/screen/ForgotPassword.dart';
 import 'package:loginsystem/screen/HomePage.dart';
 import 'package:loginsystem/screen/main.dart';
-import 'package:loginsystem/screen/register.dart'; 
+import 'package:loginsystem/screen/register.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: SingleChildScrollView(
             child: Form(
-              key: formkey, // เชื่อมต่อ formkey กับฟอร์ม
+              key: formkey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -139,25 +140,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        // Add "Forgot Password" functionality here
-                      },
-                      child: Text(
-                        'ลืมรหัสผ่านใช่ไหม?',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ),
-                  ),
+Align(
+  alignment: Alignment.centerRight,
+  child: TextButton(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+      );
+    },
+    child: Text(
+      'ลืมรหัสผ่านใช่ไหม?',
+      style: TextStyle(color: Colors.grey[600]),
+    ),
+  ),
+),
+
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
                         if (formkey.currentState!.validate()) {
-                          formkey.currentState!.save(); // บันทึกค่าลงใน profile
+                          formkey.currentState!.save();
                           try {
                             await FirebaseAuth.instance
                                 .signInWithEmailAndPassword(
@@ -171,16 +176,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                               Navigator.pushReplacement(context,
                                   MaterialPageRoute(builder: (context) {
-                                return MainScreen(email: '',); // หน้าที่จะแสดงหลังเข้าสู่ระบบสำเร็จ
+                                return MainScreen(email: '',);
                               }));
                             });
                             setState(() {
-                              errorMessage = ''; // รีเซ็ตข้อความข้อผิดพลาด
+                              errorMessage = '';
                             });
                           } on FirebaseAuthException catch (e) {
                             setState(() {
                               errorMessage = e.message ?? 'เกิดข้อผิดพลาด';
                             });
+
+                            // ✅ เพิ่ม Toast แจ้งเตือนเป็นตัวอักษรสีแดง
+                            Fluttertoast.showToast(
+                              msg: errorMessage,
+                              gravity: ToastGravity.CENTER,
+                              textColor: Colors.red,
+                            );
                           }
                         }
                       },
@@ -189,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        backgroundColor: Colors.pinkAccent, // สีพื้นหลังของปุ่ม
+                        backgroundColor: Colors.pinkAccent,
                       ),
                       child: const Text(
                         'เข้าสู่ระบบ',
@@ -214,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: () {
                         Navigator.pushReplacement(context,
                             MaterialPageRoute(builder: (context) {
-                          return RegisterScreen(''); // นำไปยังหน้าสมัครใช้งาน
+                          return RegisterScreen('');
                         }));
                       },
                       child: const Text(

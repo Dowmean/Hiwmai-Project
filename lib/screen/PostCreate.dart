@@ -42,10 +42,10 @@ final TextEditingController _carryController = TextEditingController();
     );
 
     if (compressedBytes != null) {
-      print("Original size: ${originalBytes.length} bytes");
-      print("Compressed size: ${compressedBytes.length} bytes");
+      //("Original size: ${originalBytes.length} bytes");
+      //print("Compressed size: ${compressedBytes.length} bytes");
     } else {
-      print("Compression failed");
+      //print("Compression failed");
     }
 
     return compressedBytes;
@@ -57,20 +57,20 @@ final TextEditingController _carryController = TextEditingController();
     if (pickedFile != null) {
       final File originalFile = File(pickedFile.path);
 
-      print("Original file path: ${originalFile.path}");
+      //print("Original file path: ${originalFile.path}");
 
       final Uint8List? compressedBytes = await compressImage(originalFile);
 
       if (compressedBytes != null) {
         setState(() {
           _selectedImageFile = originalFile; // ใช้ไฟล์ต้นฉบับสำหรับแสดงใน UI
-          print("Image selected successfully");
+          //print("Image selected successfully");
         });
       } else {
-        print("Image compression failed");
+        //print("Image compression failed");
       }
     } else {
-      print("No image selected");
+      //print("No image selected");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('ไม่ได้เลือกรูปภาพ')),
       );
@@ -104,16 +104,16 @@ Future<void> _submitPost() async {
       base64Image = base64Encode(await _selectedImageFile!.readAsBytes());
     }
 
-    // Log ข้อมูลที่กำลังส่ง
-    print("Submitting data:");
-    print("FirebaseUid: $firebaseUid");
-    print("Category: $_selectedCategory");
-    print("ProductName: ${_productNameController.text}");
-    print("ProductDescription: ${_productDescriptionController.text}");
-    print("Price: ${_priceController.text}");
-    print("Shipping: ${_shippingController.text}");
-    print("Carry: ${_carryController.text}");
-    print("ImageFile: $base64Image");
+    // // Log ข้อมูลที่กำลังส่ง
+    // print("Submitting data:");
+    // print("FirebaseUid: $firebaseUid");
+    // print("Category: $_selectedCategory");
+    // print("ProductName: ${_productNameController.text}");
+    // print("ProductDescription: ${_productDescriptionController.text}");
+    // print("Price: ${_priceController.text}");
+    // print("Shipping: ${_shippingController.text}");
+    // print("Carry: ${_carryController.text}");
+    // print("ImageFile: $base64Image");
 
     // ส่งข้อมูลไปยัง PostService
     await PostService().createPost(
@@ -141,7 +141,7 @@ Future<void> _submitPost() async {
       _selectedImageFile = null;
     });
   } catch (e) {
-    print('Error while creating post: $e');
+    //print('Error while creating post: $e');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้างโพสต์: $e')),
     );

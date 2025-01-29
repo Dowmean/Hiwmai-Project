@@ -22,13 +22,13 @@ class AddParcelPage extends StatelessWidget {
       );
 
       if (response.statusCode == 200) {
-        print('Data saved successfully: ${response.body}');
+     //   print('Data saved successfully: ${response.body}');
       } else {
-        print('Failed to save data: ${response.statusCode} - ${response.body}');
+        //print('Failed to save data: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to save data');
       }
     } catch (e) {
-      print('Error saving tracking number: $e');
+      //print('Error saving tracking number: $e');
     }
   }
 

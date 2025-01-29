@@ -26,10 +26,10 @@ class _ProductGridPageState extends State<ProductGridPage> {
           _products = json.decode(response.body);
         });
       } else {
-        print("Failed to fetch products: ${response.statusCode}");
+        //print("Failed to fetch products: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error fetching products: $e");
+      //print("Error fetching products: $e");
     }
   }
 

@@ -1,76 +1,78 @@
-import 'package:flutter/material.dart'; 
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
-class ToPayOrdersPage extends StatefulWidget {
+class RefundPage extends StatefulWidget {
   @override
-  _ToPayOrdersPageState createState() => _ToPayOrdersPageState();
+  _RefundPageState createState() => _RefundPageState();
 }
 
-class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
-  List<dynamic> orders = [];
+class _RefundPageState extends State<RefundPage> {
+  List<dynamic> canceledOrders = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchToPayOrders();
+    fetchCanceledOrders();
   }
 
-  Future<void> fetchToPayOrders() async {
+  // ดึงข้อมูลคำสั่งซื้อที่ถูกยกเลิก
+  Future<void> fetchCanceledOrders() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/ToPayOrders'),
+        Uri.parse('http://10.0.2.2:3000/OrderscancleAdmin'),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          orders = data['orders'];
+          canceledOrders = data['orders'];
           isLoading = false;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch unpaid orders.')),
+          SnackBar(content: Text('Failed to fetch canceled orders')),
         );
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
-      //print('Error fetching unpaid orders: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while fetching unpaid orders.')),
-      // );
+      //print('Error fetching canceled orders: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred while fetching data.')),
+      );
       setState(() {
         isLoading = false;
       });
     }
   }
 
-  Future<void> updateOrderStatus(String orderRef) async {
+  // อัปเดตสถานะคำสั่งซื้อเป็น "คืนเงินแล้ว"
+  Future<void> processRefund(String orderRef) async {
     try {
       final response = await http.put(
-        Uri.parse('http://10.0.2.2:3000/updateOrderStatus'),
+        Uri.parse('http://10.0.2.2:3000/refundOrderAdmin'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'orderRef': orderRef}),
       );
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order status updated successfully.')),
+          SnackBar(content: Text('Refund processed successfully')),
         );
-        fetchToPayOrders();
+        fetchCanceledOrders(); // รีเฟรชข้อมูลหลังจากคืนเงินแล้ว
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update order status.')),
+          SnackBar(content: Text('Failed to process refund')),
         );
       }
     } catch (e) {
-      //print('Error updating order status: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while updating order status.')),
-      // );
+      //print('Error processing refund: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred while processing refund')),
+      );
     }
   }
 
@@ -78,24 +80,22 @@ class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         centerTitle: true,
-        title: Text('คำสั่งซื้อที่ยังไม่ชำระเงิน', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text('คืนเงินคำสั่งซื้อ', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
-          : orders.isEmpty
-              ? Center(child: Text('No unpaid orders available.'))
+          : canceledOrders.isEmpty
+              ? Center(child: Text('ไม่มีคำสั่งซื้อที่ถูกยกเลิก'))
               : ListView.builder(
-                  itemCount: orders.length,
+                  itemCount: canceledOrders.length,
                   itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return OrderCard(
+                    final order = canceledOrders[index];
+                    return RefundOrderCard(
                       order: order,
-                      onRefresh: fetchToPayOrders,
-                      onUpdateStatus: updateOrderStatus,
+                      onRefund: processRefund,
                     );
                   },
                 ),
@@ -103,12 +103,11 @@ class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
   }
 }
 
-class OrderCard extends StatelessWidget {
+class RefundOrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
-  final VoidCallback onRefresh;
-  final Function(String) onUpdateStatus;
+  final Function(String) onRefund;
 
-  const OrderCard({required this.order, required this.onRefresh, required this.onUpdateStatus});
+  const RefundOrderCard({required this.order, required this.onRefund});
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +132,7 @@ class OrderCard extends StatelessWidget {
                 ),
                 Spacer(),
                 Text(
-                  "รอตรวจสอบ",
+                  "ยกเลิกแล้ว",
                   style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -172,44 +171,17 @@ class OrderCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: 16),
-ElevatedButton(
-  onPressed: () async {
-    try {
-      final response = await http.put(
-        Uri.parse('http://10.0.2.2:3000/updateOrderStatus'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'orderRef': order['order_ref']}),
-      );
-
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order status updated successfully.')),
-        );
-
-        // รีเฟรชโดยลบคำสั่งซื้อที่อัปเดตออกจากหน้าจอ
-        onRefresh();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update order status.')),
-        );
-      }
-    } catch (e) {
-      //print('Error updating order status: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while updating order status.')),
-      // );
-    }
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.green,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-  ),
-  child: Text("ยืนยันการชำระเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
-),
-
+            ElevatedButton(
+              onPressed: () => onRefund(order['order_ref']),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text("ยืนยันคืนเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
+            ),
           ],
         ),
       ),

@@ -39,7 +39,7 @@ class _RequirementPageState extends State<RequirementPage> {
         );
       }
     } catch (e) {
-      print('Error fetching users: $e');
+      //print('Error fetching users: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้')),
       );
@@ -71,7 +71,7 @@ Future<void> updateRole(String email) async {
       );
     }
   } catch (e) {
-    print('Error updating role: $e');
+    //print('Error updating role: $e');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อ')),
     );
@@ -113,7 +113,7 @@ Future<void> deleteUser(String email, String firstName) async {
       );
     }
   } catch (e) {
-    print('Error deleting user: $e');
+    //print('Error deleting user: $e');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อ')),
     );
@@ -152,7 +152,7 @@ itemBuilder: (context, index) {
                 : AssetImage('assets/avatar_placeholder.png') as ImageProvider,
             radius: 25,
             onBackgroundImageError: (exception, stackTrace) {
-              print('Error loading profile picture: $exception');
+              //print('Error loading profile picture: $exception');
             },
           ),
           SizedBox(width: 10),

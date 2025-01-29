@@ -37,10 +37,10 @@ class _ChatListPageState extends State<ChatListPage> {
           _isLoading = false;
         });
       } else {
-        print('Failed to fetch message senders: ${response.body}');
+        //print('Failed to fetch message senders: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching message senders: $e');
+      //print('Error fetching message senders: $e');
     }
   }
 
@@ -71,10 +71,10 @@ class _ChatListPageState extends State<ChatListPage> {
           _isLoading = false;
         });
       } else {
-        print('Failed to fetch messages for receiver: ${response.body}');
+        //print('Failed to fetch messages for receiver: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching messages for receiver: $e');
+      //print('Error fetching messages for receiver: $e');
     }
   }
 

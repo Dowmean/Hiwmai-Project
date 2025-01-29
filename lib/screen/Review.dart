@@ -54,10 +54,10 @@ class _ReviewPageState extends State<ReviewPage> with SingleTickerProviderStateM
         });
       }
     } catch (e) {
-      print('Error fetching reviews orders: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching reviews orders')),
-      );
+      //print('Error fetching reviews orders: $e');
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(content: Text('Error fetching reviews orders')),
+      // );
       setState(() {
         isLoading = false;
       });
