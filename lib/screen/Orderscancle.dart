@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/Refund.dart';
 import 'dart:convert';
 
@@ -73,13 +74,13 @@ class _OrdersCancelPageState extends State<OrdersCancelPage> {
                     return OrderCard(
                       order: order,
                       onNavigateRefund: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RefundPage(
-                            ),
-                          ),
-                        );
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => RefundPage(order: order),
+  ),
+);
+
                       },
                     );
                   },
@@ -96,6 +97,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Card(
       margin: EdgeInsets.all(8.0),
       child: Padding(
@@ -138,10 +140,10 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("x ${order['quantity']}"),
-                Text(
-                  "฿${double.tryParse(order['product_price']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
-                  style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
-                ),
+Text(
+  "${formatter.format(double.tryParse(order['product_price']?.toString() ?? '0') ?? 0.00)}",
+  style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
+),
               ],
             ),
             Divider(),
@@ -149,10 +151,10 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("รวมคำสั่งซื้อ:"),
-                Text(
-                  "฿${(order['total'] != null ? double.tryParse(order['total'].toString())?.toStringAsFixed(2) : '0.00')}",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+Text(
+  "รวมทั้งหมด: ${order['total'] != null ? formatter.format(double.tryParse(order['total'].toString()) ?? 0.00) : '0.00'}",
+  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+),
               ],
             ),
             SizedBox(height: 16),

@@ -83,7 +83,7 @@ class _ChatListPageState extends State<ChatListPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Messages',
+          'ข้อความของฉัน',
           style: TextStyle(fontSize: 20,color: Colors.white, fontWeight: FontWeight.bold,),
         ),
         backgroundColor: Colors.pink,

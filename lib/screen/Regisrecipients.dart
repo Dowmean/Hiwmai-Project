@@ -4,7 +4,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img; // ใช้สำหรับย่อขนาดภาพ
-import 'package:firebase_auth/firebase_auth.dart'; // สำหรับ Firebase Authentication
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:loginsystem/screen/SelectAddress.dart'; // สำหรับ Firebase Authentication
 
 class RegisrecipientsScreen extends StatefulWidget {
   @override
@@ -24,15 +25,23 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
   // Text editing controllers for second form
   final TextEditingController _bankNameController = TextEditingController();
   final TextEditingController _accountNameController = TextEditingController();
-  final TextEditingController _accountNumberController = TextEditingController();
+  final TextEditingController _accountNumberController =
+      TextEditingController();
 
   bool _showSecondForm = false;
   String? _firebaseUid;
 
-    @override
+  @override
   void initState() {
     super.initState();
     _getFirebaseUid(); // ดึง firebase_uid ของผู้ใช้ที่เข้าสู่ระบบ
+    _getEmail().then((email) {
+      if (email != null && email.isNotEmpty) {
+        _fetchDefaultAddress(); // ✅ โหลดที่อยู่ค่าเริ่มต้นหลังจากโหลด email สำเร็จ
+      } else {
+        print("❌ ไม่สามารถโหลด email ได้");
+      }
+    });
   }
 
   Future<void> _getFirebaseUid() async {
@@ -41,6 +50,44 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
       _firebaseUid = user?.uid;
     });
     //print("Firebase UID: $_firebaseUid"); // Debug: ตรวจสอบค่า firebase_uid
+  }
+
+  Future<String?> _getEmail() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    return user?.email; // ✅ ดึง email
+  }
+
+  Future<void> _fetchDefaultAddress() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String? email = user?.email; // ✅ ใช้ email
+
+    if (email == null || email.isEmpty) {
+      print("❌ ไม่มี Email - ดึงที่อยู่ไม่ได้");
+      return;
+    }
+
+    print("📌 กำลังดึงที่อยู่ค่าเริ่มต้นสำหรับ: $email");
+
+    final response = await http
+        .get(Uri.parse('http://10.0.2.2:3000/addresses/default/$email'));
+
+    print("📌 API Response: ${response.body}"); // 🔥 Debug API Response
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (data.isNotEmpty) {
+        setState(() {
+          _addressController.text =
+              "${data['address_detail']}, ${data['subdistrict']}, ${data['district']}, ${data['province']}, ${data['postal_code']}";
+        });
+        print("✅ โหลดที่อยู่สำเร็จ: ${_addressController.text}");
+      } else {
+        print("❌ ไม่พบที่อยู่ค่าเริ่มต้น");
+      }
+    } else {
+      print("❌ API Error: ${response.statusCode} ${response.body}");
+    }
   }
 
   @override
@@ -157,22 +204,17 @@ class _RegisrecipientsScreenState extends State<RegisrecipientsScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_showSecondForm) {
-        
-        
-
-final data = {
-  "firebase_uid": _firebaseUid,
-  "title": _titleController.text,
-  "firstName": _firstNameController.text,
-  "lastName": _lastNameController.text,
-  "phoneNumber": _phoneNumberController.text,
-  "address": _addressController.text,
-  "bankName": _bankNameController.text,
-  "accountName": _accountNameController.text,
-  "accountNumber": _accountNumberController.text
-};//print(data); // ตรวจสอบว่าข้อมูลครบถ้วนก่อนส่งออก
-
-
+        final data = {
+          "firebase_uid": _firebaseUid,
+          "title": _titleController.text,
+          "firstName": _firstNameController.text,
+          "lastName": _lastNameController.text,
+          "phoneNumber": _phoneNumberController.text,
+          "address": _addressController.text,
+          "bankName": _bankNameController.text,
+          "accountName": _accountNameController.text,
+          "accountNumber": _accountNumberController.text
+        }; //print(data); // ตรวจสอบว่าข้อมูลครบถ้วนก่อนส่งออก
 
         final response = await http.post(
           Uri.parse("http://10.0.2.2:3000/saveUserData"),
@@ -197,6 +239,68 @@ final data = {
     }
   }
 
+Widget _buildAddressField() {
+  return GestureDetector(
+    onTap: () async {
+      final selectedAddress = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SelectAddressScreen()),
+      );
+
+      if (selectedAddress != null) {
+        setState(() {
+          _addressController.text =
+              "${selectedAddress['address_detail']}, ${selectedAddress['subdistrict']}, ${selectedAddress['district']}, ${selectedAddress['province']}, ${selectedAddress['postal_code']}";
+        });
+      }
+    },
+    child: Card(
+      margin: EdgeInsets.symmetric(vertical: 10),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.location_on, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _firstNameController.text.isNotEmpty
+                        ? "${_firstNameController.text} ${_lastNameController.text}"
+                        : "เลือกที่อยู่",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    _phoneNumberController.text.isNotEmpty
+                        ? "(${_phoneNumberController.text})"
+                        : "",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    _addressController.text.isNotEmpty
+                        ? _addressController.text
+                        : "กดเพื่อเลือกที่อยู่",
+                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -216,33 +320,45 @@ final data = {
               if (!_showSecondForm) ...[
                 Text(
                   "ข้อมูลของผู้รับผลประโยชน์",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.pink),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.pink),
                 ),
                 SizedBox(height: 16),
                 GestureDetector(
                   onTap: _selectTitle,
                   child: AbsorbPointer(
-                    child: _buildInputField("คำนำหน้า", _titleController, "กรอกคำนำหน้า"),
+                    child: _buildInputField(
+                        "คำนำหน้า", _titleController, "กรอกคำนำหน้า"),
                   ),
                 ),
-                _buildInputField("ชื่อจริง", _firstNameController, "กรอกชื่อจริง"),
+                _buildInputField(
+                    "ชื่อจริง", _firstNameController, "กรอกชื่อจริง"),
                 _buildInputField("นามสกุล", _lastNameController, "กรอกนามสกุล"),
-                _buildInputField("เบอร์โทรศัพท์", _phoneNumberController, "กรอกเบอร์โทรศัพท์"),
-                _buildInputField("ที่อยู่", _addressController, "กรอกที่อยู่", maxLines: 3),
+                _buildInputField("เบอร์โทรศัพท์", _phoneNumberController,
+                    "กรอกเบอร์โทรศัพท์"),
+                _buildAddressField(),
               ] else ...[
                 Text(
                   "ข้อมูลธนาคาร",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.pink),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.pink),
                 ),
                 SizedBox(height: 16),
                 GestureDetector(
                   onTap: _selectBank,
                   child: AbsorbPointer(
-                    child: _buildInputField("ธนาคาร", _bankNameController, "เลือกธนาคาร"),
+                    child: _buildInputField(
+                        "ธนาคาร", _bankNameController, "เลือกธนาคาร"),
                   ),
                 ),
-                _buildInputField("ชื่อบัญชีธนาคาร", _accountNameController, "กรอกชื่อบัญชี"),
-                _buildInputField("หมายเลขบัญชีธนาคาร", _accountNumberController, "กรอกเลขบัญชี"),
+                _buildInputField(
+                    "ชื่อบัญชีธนาคาร", _accountNameController, "กรอกชื่อบัญชี"),
+                _buildInputField("หมายเลขบัญชีธนาคาร", _accountNumberController,
+                    "กรอกเลขบัญชี"),
               ],
               SizedBox(height: 20),
               ElevatedButton(
@@ -263,7 +379,9 @@ final data = {
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, String hintText, {int maxLines = 1}) {
+  Widget _buildInputField(
+      String label, TextEditingController controller, String hintText,
+      {int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(

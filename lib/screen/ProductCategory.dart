@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'ProductDetailPage.dart'; // Import the ProductDetailPage for navigation
 
 class CategoryProductPage extends StatefulWidget {
@@ -56,6 +57,7 @@ class _CategoryProductPageState extends State<CategoryProductPage> {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -181,13 +183,10 @@ product['profilePicture'] != null && product['profilePicture'].isNotEmpty
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: Text(
-                                "Price: ฿${product['price']}",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
+child: Text(
+  "${formatter.format(double.tryParse(product['price'].toString()) ?? 0.00)}", // ✅ ใช้ formatter.format
+  style: TextStyle(color: Colors.pink[600]),
+),
                             ),
                           ],
                         ),

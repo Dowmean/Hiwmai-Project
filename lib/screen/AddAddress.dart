@@ -15,13 +15,13 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController addressDetailController = TextEditingController();
-  
+
   String? selectedProvince;
   String? selectedDistrict;
   String? selectedSubdistrict;
-  String? postalCode;
+  String? postalCode = "-"; // ✅ ค่าเริ่มต้น
   bool isDefault = false;
-  String addressType = "บ้าน"; // ค่าเริ่มต้น
+  String addressType = "บ้าน"; // ✅ ค่าเริ่มต้น
 
   List<dynamic> provinces = [];
   List<dynamic> districts = [];
@@ -33,8 +33,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     fetchProvinces();
   }
 
+  // ✅ ดึงข้อมูลจังหวัด
   Future<void> fetchProvinces() async {
-    final response = await http.get(Uri.parse('https://www.androidthai.in.th/flutter/getAllprovinces.php'));
+    final response = await http.get(Uri.parse('http://10.0.2.2:3000/provinces'));
     if (response.statusCode == 200) {
       setState(() {
         provinces = json.decode(response.body);
@@ -42,27 +43,45 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     }
   }
 
-  Future<void> fetchDistricts(String province) async {
-    final response = await http.get(Uri.parse('https://www.androidthai.in.th/flutter/getDistrictWhereProvince.php?isAdd=true&province=$province'));
+  // ✅ ดึงข้อมูลอำเภอ
+  Future<void> fetchDistricts(String provinceId) async {
+    final response = await http.get(Uri.parse('http://10.0.2.2:3000/amphures/$provinceId'));
     if (response.statusCode == 200) {
       setState(() {
         districts = json.decode(response.body);
         selectedDistrict = null;
         selectedSubdistrict = null;
+        subdistricts = [];
+        postalCode = "-";
       });
     }
   }
 
-  Future<void> fetchSubdistricts(String district) async {
-    final response = await http.get(Uri.parse('https://www.androidthai.in.th/flutter/getSubDistrictWhereDistrict.php?isAdd=true&district=$district'));
+  // ✅ ดึงข้อมูลตำบล
+  Future<void> fetchSubdistricts(String districtId) async {
+    final response = await http.get(Uri.parse('http://10.0.2.2:3000/districts/$districtId'));
     if (response.statusCode == 200) {
       setState(() {
         subdistricts = json.decode(response.body);
         selectedSubdistrict = null;
+        postalCode = "-";
       });
     }
   }
 
+  // ✅ อัปเดตรหัสไปรษณีย์เมื่อเลือกตำบล
+  void updatePostalCode(String subdistrictName) {
+    final subdistrict = subdistricts.firstWhere(
+      (s) => s["name_th"] == subdistrictName,
+      orElse: () => {"zip_code": "-"},
+    );
+
+    setState(() {
+      postalCode = subdistrict["zip_code"].toString();
+    });
+  }
+
+  // ✅ เพิ่มที่อยู่ลงฐานข้อมูล
   Future<void> addAddress() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -123,7 +142,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 value: selectedProvince,
                 items: provinces.map<DropdownMenuItem<String>>((province) {
                   return DropdownMenuItem<String>(
-                    value: province["name_th"] as String,
+                    value: province["id"].toString(),
                     child: Text(province["name_th"]),
                   );
                 }).toList(),
@@ -140,7 +159,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 value: selectedDistrict,
                 items: districts.map<DropdownMenuItem<String>>((district) {
                   return DropdownMenuItem<String>(
-                    value: district["name_th"] as String,
+                    value: district["id"].toString(),
                     child: Text(district["name_th"]),
                   );
                 }).toList(),
@@ -157,69 +176,54 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                 value: selectedSubdistrict,
                 items: subdistricts.map<DropdownMenuItem<String>>((subdistrict) {
                   return DropdownMenuItem<String>(
-                    value: subdistrict["name_th"] as String,
+                    value: subdistrict["name_th"],
                     child: Text(subdistrict["name_th"]),
                   );
                 }).toList(),
                 onChanged: (newValue) {
                   setState(() {
                     selectedSubdistrict = newValue;
+                    updatePostalCode(newValue!);
                   });
                 },
                 decoration: const InputDecoration(labelText: "เลือกตำบล/แขวง"),
               ),
+              const SizedBox(height: 10),
+              Text("รหัสไปรษณีย์: ${postalCode ?? '-'}"),
               const SizedBox(height: 10),
               TextFormField(
                 controller: addressDetailController,
                 decoration: const InputDecoration(labelText: "รายละเอียดที่อยู่"),
                 validator: (value) => value!.isEmpty ? "กรุณากรอกรายละเอียดที่อยู่" : null,
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Text("ประเภทที่อยู่:"),
-                  const SizedBox(width: 10),
-                  ChoiceChip(
-                    label: const Text("บ้าน"),
-                    selected: addressType == "บ้าน",
-                    onSelected: (selected) {
-                      setState(() {
-                        addressType = "บ้าน";
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  ChoiceChip(
-                    label: const Text("ที่ทำงาน"),
-                    selected: addressType == "ที่ทำงาน",
-                    onSelected: (selected) {
-                      setState(() {
-                        addressType = "ที่ทำงาน";
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  ChoiceChip(
-                    label: const Text("อื่นๆ"),
-                    selected: addressType == "อื่นๆ",
-                    onSelected: (selected) {
-                      setState(() {
-                        addressType = "อื่นๆ";
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              CheckboxListTile(
-                title: const Text("ตั้งเป็นที่อยู่เริ่มต้น"),
+               // 🔹 ตั้งค่า "ที่อยู่ตั้งต้น"
+              SwitchListTile(
+                title: const Text("เลือกเป็นที่อยู่ตั้งต้น"),
                 value: isDefault,
                 onChanged: (value) {
                   setState(() {
-                    isDefault = value!;
+                    isDefault = value;
                   });
                 },
               ),
+
+              // 🔹 ประเภทที่อยู่
+              const Text("ติดป้ายเป็น:"),
+              Wrap(
+                spacing: 10,
+                children: ["ที่ทำงาน", "บ้าน", "อื่นๆ"].map((type) {
+                  return ChoiceChip(
+                    label: Text(type),
+                    selected: addressType == type,
+                    onSelected: (selected) {
+                      setState(() {
+                        addressType = type;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: addAddress,

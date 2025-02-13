@@ -1,41 +1,36 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 
 class PostService {
-  final String baseUrl = 'http://10.0.2.2:3000'; 
-  final String apiUrl = 'http://10.0.2.2:3000/checkRoleAndOwnership';
-  
-  get imagePath => null;
-  
+  final String baseUrl = 'http://10.0.2.2:3000';
 
-
-  // Function to create a new post
-Future<void> createPost({
+  // สร้างโพสต์ใหม่
+  Future<void> createPost({
     required String firebaseUid,
     required String category,
     required String productName,
     required String productDescription,
     required double price,
-    required double shipping, // เพิ่มฟิลด์ shipping
-    required double carry, // เพิ่มฟิลด์ carry
+    required double shipping,
+    required double carry,
     String? imageFile, // Base64-encoded image
   }) async {
-    final String apiUrl = '$baseUrl/createpost'; // Full API URL
+    final String apiUrl = '$baseUrl/createpost';
 
-    // Data to send to the server
-Map<String, dynamic> postData = {
-  'productName': productName,
-  'productDescription': productDescription,
-  'price': price,
-  'shipping': shipping,
-  'carry': carry,
-  'category': category,
-  'imageUrl': imageFile != null && imageFile.isNotEmpty ? imageFile : '',
-};
-
+    Map<String, dynamic> postData = {
+      'firebase_uid': firebaseUid,
+      'category': category,
+      'productName': productName,
+      'productDescription': productDescription,
+      'price': price,
+      'shipping': shipping,
+      'carry': carry,
+      'imageUrl': imageFile ?? '', // ใช้ค่าว่างถ้าไม่มีรูป
+    };
 
     try {
-      //print("Sending data: ${json.encode(postData)}");
+      print("🚀 Sending data: \${json.encode(postData)}");
 
       var response = await http.post(
         Uri.parse(apiUrl),
@@ -43,26 +38,18 @@ Map<String, dynamic> postData = {
         body: json.encode(postData),
       );
 
-      // Handle response
       if (response.statusCode == 201) {
-        //print("Post created successfully: ${response.body}");
+        print("✅ Post created successfully: \${response.body}");
       } else {
-        //print("Failed to create post: ${response.statusCode}, ${response.body}");
+        print("❌ Failed to create post: \${response.statusCode}, \${response.body}");
       }
     } catch (e) {
-      //print("Error submitting post: $e");
+      print("⚠️ Error submitting post: $e");
     }
   }
 
-
-  deletePost(product) {}
-
-  editPost(product, {required String productName, required String productDescription, required price, required shipping, required carry, required String category, required imagePath}) {}
-}
-
-
-  // ฟังก์ชันสำหรับแก้ไขโพสต์
-Future<bool> editPost(
+  // แก้ไขโพสต์
+Future<void> editPost(
   int id, {
   required String productName,
   required String productDescription,
@@ -70,8 +57,15 @@ Future<bool> editPost(
   required double shipping,
   required double carry,
   required String category,
-  required String? imagePath,
+  String? imageFile, // Base64 or existing file name
 }) async {
+  final String apiUrl = '$baseUrl/editpost/$id';
+
+  // ✅ ถ้าเป็น Base64, ต้องล้าง data:image/jpeg;base64, ออกก่อน
+  if (imageFile != null && imageFile.startsWith('data:image')) {
+    imageFile = imageFile.replaceFirst(RegExp(r'data:image/[^;]+;base64,'), '');
+  }
+
   Map<String, dynamic> postData = {
     'productName': productName,
     'productDescription': productDescription,
@@ -79,12 +73,12 @@ Future<bool> editPost(
     'shipping': shipping,
     'carry': carry,
     'category': category,
-    'imageUrl': imagePath != null && imagePath.isNotEmpty ? imagePath : null,
+    'imageUrl': imageFile ?? '', // ✅ ใช้ค่าว่างถ้าไม่มีรูปใหม่
   };
 
   try {
-    final String apiUrl = 'http://10.0.2.2:3000/editpost/$id';
-    //print("Sending data to backend: $postData");
+    print("🚀 Sending edit request to $apiUrl");
+    print("🛠️ Payload: ${json.encode(postData)}");
 
     var response = await http.put(
       Uri.parse(apiUrl),
@@ -92,65 +86,62 @@ Future<bool> editPost(
       body: json.encode(postData),
     );
 
+    print("📢 Response: ${response.statusCode} - ${response.body}");
+
     if (response.statusCode == 200) {
-      //print("Post updated successfully: ${response.body}");
-      return true;
+      print("✅ Post updated successfully: ${response.body}");
     } else {
-      //print("Failed to update post: ${response.statusCode}, ${response.body}");
-      return false;
+      print("❌ Failed to update post: ${response.statusCode}, ${response.body}");
     }
   } catch (e) {
-    //print("Error updating post: $e");
-    return false;
+    print("⚠️ Error updating post: $e");
   }
 }
 
 
+  // ลบโพสต์
+  Future<void> deletePost(int id) async {
+    final String apiUrl = '$baseUrl/deletepost/$id';
+    try {
+      print("🚀 Deleting post ID: $id");
 
-  // ฟังก์ชันสำหรับลบโพสต์
-Future<bool> deletePost(int id) async {
-  try {
-    final String apiUrl = 'http://10.0.2.2:3000/deletepost/$id';
-    var response = await http.delete(
-      Uri.parse(apiUrl),
-    );
+      var response = await http.delete(
+        Uri.parse(apiUrl),
+      );
 
-    if (response.statusCode == 200) {
-      //print("Post deleted successfully: ${response.body}");
-      return true;
-    } else {
-      //print("Failed to delete post: ${response.statusCode}, ${response.body}");
-      return false;
+      if (response.statusCode == 200) {
+        print("✅ Post deleted successfully: \${response.body}");
+      } else {
+        print("❌ Failed to delete post: \${response.statusCode}, \${response.body}");
+      }
+    } catch (e) {
+      print("⚠️ Error deleting post: $e");
     }
-  } catch (e) {
-    //print("Error deleting post: $e");
-    return false;
+  }
+
+  // ดึงโพสต์ตาม ID
+  Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
+    final url = Uri.parse('$baseUrl/getproduct/fetchByIds');
+
+    try {
+      print('🚀 Fetching products for IDs: $productIds');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'product_ids': productIds}),
+      ).timeout(Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> products = jsonDecode(response.body);
+        print('✅ Fetched products: $products');
+        return products;
+      } else {
+        print('❌ Failed to fetch products: \${response.statusCode} - \${response.body}');
+        throw Exception('Failed to fetch products');
+      }
+    } catch (e) {
+      print('⚠️ Error fetching products: $e');
+      throw Exception('Error fetching products: $e');
+    }
   }
 }
-
-
-
-Future<List<dynamic>> fetchProductsByIds(List<int> productIds) async {
-  final url = Uri.parse('http://10.0.2.2:3000/getproduct/fetchByIds');
-  try {
-    //print('Fetching products for IDs: $productIds');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'product_ids': productIds}),
-    ).timeout(Duration(seconds: 10)); // เพิ่ม timeout
-
-    if (response.statusCode == 200) {
-      final List<dynamic> products = jsonDecode(response.body);
-      //print('Fetched products: $products');
-      return products;
-    } else {
-      //print('Failed to fetch products: ${response.statusCode} - ${response.body}');
-      throw Exception('Failed to fetch products');
-    }
-  } catch (e) {
-    //print('Error fetching products: $e');
-    throw Exception('Error fetching products: $e');
-  }
-}
-  toggleFavoriteStatus({required String userId, required String productId, required bool isFavorite}) {}

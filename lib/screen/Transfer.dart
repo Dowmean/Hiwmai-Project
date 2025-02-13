@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class TransferPage extends StatefulWidget {
   final String firebaseUid;
@@ -10,6 +11,7 @@ class TransferPage extends StatefulWidget {
     Key? key,
     required this.firebaseUid,
     required this.totalIncome,
+    required amount,
   }) : super(key: key);
 
   @override
@@ -36,7 +38,8 @@ class _TransferPageState extends State<TransferPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2:3000/recipients/${widget.firebaseUid}/transfer'),
+        Uri.parse(
+            'http://10.0.2.2:3000/recipients/${widget.firebaseUid}/transfer'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'reference_number': _referenceController.text}),
       );
@@ -49,7 +52,8 @@ class _TransferPageState extends State<TransferPage> {
         Navigator.pop(context);
       } else {
         setState(() {
-          _errorMessage = 'Error: ${response.statusCode} - ${response.reasonPhrase}';
+          _errorMessage =
+              'Error: ${response.statusCode} - ${response.reasonPhrase}';
         });
       }
     } catch (e) {
@@ -65,6 +69,7 @@ class _TransferPageState extends State<TransferPage> {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -76,10 +81,10 @@ class _TransferPageState extends State<TransferPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'รอดำเนินการทั้งหมด: ${widget.totalIncome}บาท', // แสดงรายได้ที่ส่งมาจากหน้า RecipientDetailPage
-              style: TextStyle(fontSize: 18),
-            ),
+Text(
+  'รอดำเนินการทั้งหมด: ${formatter.format(double.tryParse(widget.totalIncome?.toString() ?? '0') ?? 0.00)} บาท',
+  style: TextStyle(fontSize: 18),
+),
             SizedBox(height: 20),
             TextField(
               controller: _referenceController,
@@ -97,10 +102,31 @@ class _TransferPageState extends State<TransferPage> {
             if (_isLoading)
               Center(child: CircularProgressIndicator())
             else
-              ElevatedButton(
-                onPressed: _transferIncome,
-                child: Text('บันทึก'),
-              ),
+Row(
+  mainAxisAlignment: MainAxisAlignment.end, // ✅ จัดปุ่มไปด้านขวา
+  children: [
+    ElevatedButton(
+      onPressed: _transferIncome,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.pink, // ✅ ปุ่มสีชมพู
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10), // ✅ ปุ่มโค้งมน
+        ),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12), // ✅ ปรับขนาดปุ่ม
+      ),
+      child: Text(
+        'บันทึก',
+        style: TextStyle(
+          fontSize: 16, 
+          color: Colors.white, 
+        ),
+      ),
+    ),
+  ],
+),
+
+
+
           ],
         ),
       ),

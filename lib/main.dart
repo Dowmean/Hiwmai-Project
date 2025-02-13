@@ -1,27 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Import Firebase core
+import 'package:firebase_core/firebase_core.dart';
 import 'package:loginsystem/screen/login.dart';
-import 'package:loginsystem/screen/main.dart'; // ตรวจสอบว่าเส้นทางถูกต้อง
+import 'package:loginsystem/screen/main.dart';
+import 'package:web_socket_channel/io.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensures Flutter is initialized
-  await Firebase.initializeApp(); // Initialize Firebase
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); 
   runApp(const MainApp());
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   const MainApp({super.key});
+
+  @override
+  _MainAppState createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  // ✅ สร้าง WebSocket Global Connection
+  final websocketChannel = IOWebSocketChannel.connect('ws://10.0.2.2:3000');
+
+  @override
+  void initState() {
+    super.initState();
+    websocketChannel.stream.listen((message) {
+      if (message == "reload") {
+        print("🔄 รีโหลดข้อมูลทั้งหมด...");
+        setState(() {}); // รีโหลด UI ทั้งแอป
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    websocketChannel.sink.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,  
+        primarySwatch: Colors.blue,
       ),
-      home: const LoginScreen(),  // เรียกใช้ LoginScreen เป็นหน้าแรก
+      home: const LoginScreen(), 
       routes: {
-        '/main': (context) => MainScreen(email: '',), // ตรวจสอบว่าต้องการพารามิเตอร์หรือไม่
+        '/main': (context) => MainScreen(email: ''), 
       },
     );
   }

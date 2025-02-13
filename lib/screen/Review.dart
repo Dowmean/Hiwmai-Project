@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/MyReviews.dart';
 import 'dart:convert';
 
@@ -36,7 +37,7 @@ class _ReviewPageState extends State<ReviewPage> with SingleTickerProviderStateM
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/getReviewsOrdersByEmail?email=$email'),
+        Uri.parse('http://10.0.2.2:3000/getReviewsOrdersByEmailRecipient?email=$email'),
       );
 
       if (response.statusCode == 200) {
@@ -89,6 +90,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Card(
       margin: EdgeInsets.all(8.0),
       child: Padding(
@@ -132,10 +134,10 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("x ${order['quantity']}"),
-                Text(
-                  "฿${double.tryParse(order['product_price']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
-                  style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
-                ),
+Text(
+  "${formatter.format(double.tryParse(order['product_price']?.toString() ?? '0') ?? 0.00)}",
+  style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
+),
               ],
             ),
             Divider(),
@@ -143,10 +145,10 @@ class OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("1 ชิ้น"),
-                Text(
-                  "รวมทั้งหมด: ฿${(order['total'] != null ? double.tryParse(order['total'].toString())?.toStringAsFixed(2) : '0.00')}",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+Text(
+  "รวมทั้งหมด: ${order['total'] != null ? formatter.format(double.tryParse(order['total'].toString()) ?? 0.00) : '0.00'}",
+  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+),
               ],
             ),
             SizedBox(height: 16),
@@ -154,6 +156,10 @@ class OrderCard extends StatelessWidget {
               "หมายเลขคำสั่งซื้อ: ${order['order_ref'] ?? '-'}",
               style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
+            Text(
+              "เลขพัสดุ: ${order['trackingnumber'] ?? 'ยังไม่มีเลขพัสดุ'}",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ), 
             SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -173,11 +179,11 @@ ElevatedButton(
   style: ElevatedButton.styleFrom(
     backgroundColor: Colors.pink,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
     ),
     padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
   ),
-  child: Text("คะแนน", style: TextStyle(fontSize: 16)),
+  child: Text("คะแนน", style: TextStyle(fontSize: 16, color: Colors.white)),
 ),
 
 

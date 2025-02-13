@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/MyReviews.dart';
 
 class SuccessAndReviewPage extends StatefulWidget {
@@ -25,7 +26,7 @@ class _SuccessAndReviewPageState extends State<SuccessAndReviewPage> {
   Future<void> fetchSuccessAndReviewOrders() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/SuccessAndReviewOrders'), // URL ของ API
+        Uri.parse('http://10.0.2.2:3000/SuccessAndReviewOrdersAdmin'), // ✅ URL ของ API
         headers: {
           'Content-Type': 'application/json',
         },
@@ -47,10 +48,6 @@ class _SuccessAndReviewPageState extends State<SuccessAndReviewPage> {
         });
       }
     } catch (e) {
-      //print('Error fetching orders: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while fetching orders.')),
-      // );
       setState(() {
         isLoading = false;
       });
@@ -116,6 +113,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Card(
       margin: const EdgeInsets.all(8.0),
       child: Padding(
@@ -159,16 +157,64 @@ class OrderCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const Divider(),
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text("x ${order['quantity']}"), // ✅ จำนวนสินค้า
+
+    SizedBox(height: 4), // ✅ เพิ่มระยะห่าง
+
+    Row(
+      mainAxisAlignment: MainAxisAlignment.end, // ✅ ชิดขวา
+      children: [
+        Text(
+          "${formatter.format(double.tryParse(order['product_price']?.toString() ?? '0') ?? 0.00)}",
+          style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
+        ), // ✅ ราคาสินค้า
+      ],
+    ),
+
+    SizedBox(height: 4), // ✅ เพิ่มระยะห่าง
+
+    Row(
+      mainAxisAlignment: MainAxisAlignment.end, // ✅ ชิดขวา
+      children: [
+        Text(
+          "รวมทั้งหมด: ${order['total'] != null ? formatter.format(double.tryParse(order['total'].toString()) ?? 0.00) : '0.00'}",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ), // ✅ ราคารวมทั้งหมด
+      ],
+    ),
+  ],
+),
+
+
+            const SizedBox(height: 10),
+
+            // ✅ เพิ่มส่วนแสดง Tracking Number
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("x ${order['quantity']}"),
+                Text("เลขพัสดุ:", style: TextStyle(color: Colors.grey)),
                 Text(
-                  "฿${double.tryParse(order['product_price']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
-                  style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
+                  order['trackingnumber'] ?? 'ยังไม่มีเลขพัสดุ',
+                  style: TextStyle(color: Colors.grey),
                 ),
               ],
             ),
+            
+            // ✅ แสดงหมายเลขอ้างอิง (ref)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("หมายเลขคำสั่งซื้อ:", style: TextStyle(color: Colors.grey)),
+                Text(
+                  order['order_ref'] ?? 'ไม่มีหมายเลขอ้างอิง',
+                  style: TextStyle(color: Colors.black),
+                ),
+              ],
+            ),
+
             const SizedBox(height: 16),
             if (showReviewButton)
               Center(

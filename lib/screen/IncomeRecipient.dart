@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/Transfer.dart';
 
 class  IncomeRecipient extends StatelessWidget {
@@ -39,6 +40,7 @@ Future<Map<String, dynamic>> fetchIncomeData() async {
 
 @override
 Widget build(BuildContext context) {
+  final formatter = new NumberFormat("#,##0.00", "th");
   return FutureBuilder<Map<String, dynamic>>(
     future: fetchIncomeData(),
     builder: (context, snapshot) {
@@ -212,35 +214,36 @@ Widget build(BuildContext context) {
             '${firstDate.day} ${_getMonthName(firstDate.month)} ${firstDate.year}';
         final lastDateFormatted =
             '${lastDate.day} ${_getMonthName(lastDate.month)} ${lastDate.year}';
-
+        final formatter = new NumberFormat("#,##0.00", "th");
         // ระบุสถานะสำหรับแต่ละ Tab
-        String statusLabel;
-        if (endpoint == 'ALLincome') {
-          statusLabel = 'ทั้งหมด';
-        } else if (endpoint == 'Successincome') {
-          statusLabel = 'รอดำเนินการ';
-        } else if (endpoint == 'Complete') {
-          statusLabel = 'ทำการจ่ายเรียบร้อยแล้ว';
-        } else {
-          statusLabel = 'ไม่ทราบสถานะ';
-        }
+String statusLabel;
+if (endpoint == 'ALLincome') {
+  statusLabel = 'ทั้งหมด';
+} else if (endpoint == 'Successincome') {
+  statusLabel = 'รอดำเนินการ';
+} else if (endpoint == 'Complete') {
+  statusLabel = 'ทำการจ่ายเรียบร้อยแล้ว';
+} else {
+  statusLabel = 'ไม่ทราบสถานะ';
+}
 
-        return ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            ListTile(
-              title: Text(
-                '$firstDateFormatted - $lastDateFormatted',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text('สถานะ: $statusLabel'),
-              trailing: Text(
-                '฿${incomeData['totalIncome']}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
-              ),
-            ),
-          ],
-        );
+return ListView(
+  padding: const EdgeInsets.all(16.0),
+  children: [
+    ListTile(
+      title: Text(
+        '$firstDateFormatted - $lastDateFormatted',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text('สถานะ: $statusLabel'),
+trailing: Text(
+  '${formatter.format(double.tryParse(incomeData['totalIncome'].toString()) ?? 0.0)} ฿',
+  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),
+),
+
+    ),
+  ],
+);
       }
     },
   );

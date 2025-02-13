@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/AllOrdersuccessfu.dart';
 import 'package:loginsystem/screen/IncomeRecipient.dart';
 import 'package:loginsystem/screen/OrderHistory.dart';
@@ -206,6 +207,7 @@ String formatDate(String isoDate) {
 
 @override
 Widget build(BuildContext context) {
+  final formatter = new NumberFormat("#,##0.00", "th");
   return Scaffold(
     appBar: AppBar(
       backgroundColor: Colors.pink,
@@ -335,7 +337,7 @@ if (currentUserRole == 'Admin') ...[
     mainAxisAlignment: MainAxisAlignment.center, // จัดตำแหน่งให้อยู่ตรงกลาง
     
     children: [
-      SizedBox(width: 20),
+      SizedBox(width: 7),
       // เมนู "ยังไม่ชำระ"
       _buildMenuIcon(
         context,
@@ -348,10 +350,11 @@ if (currentUserRole == 'Admin') ...[
           );
         },
       ),
+      SizedBox(width: 30),
       _buildMenuIcon(
         context,
         icon: Icons.done_all,
-        label: 'คำสั่งซื้อสำเร็จ',
+        label: 'สำเร็จ',
         onTap: () {
           Navigator.push(
             context,
@@ -359,10 +362,11 @@ if (currentUserRole == 'Admin') ...[
           );
         },
       ),
+      SizedBox(width: 30),
       _buildMenuIcon(
         context,
         icon: Icons.done_all,
-        label: 'ทำการจ่ายเรียบร้อยแล้ว',
+        label: 'จ่ายแล้ว',
         onTap: () {
           Navigator.push(
             context,
@@ -370,6 +374,7 @@ if (currentUserRole == 'Admin') ...[
           );
         },
       ),
+      SizedBox(width: 30),
       //เมนู "ยกเลิก"
       _buildMenuIcon(
         context,
@@ -428,6 +433,7 @@ if (currentUserRole == 'Admin') ...[
 
 // แสดงเฉพาะ Role User
 if (currentUserRole == 'User')
+
   Padding(
     padding: const EdgeInsets.all(16.0),
     child: Column(
@@ -637,7 +643,7 @@ Padding(
           ),
           SizedBox(height: 10),
           Text(
-            '${totalIncome.toStringAsFixed(2)}',
+            '${formatter.format(totalIncome)}',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,

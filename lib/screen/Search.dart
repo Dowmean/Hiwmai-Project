@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:loginsystem/screen/ProductDetailPage.dart';
 
 class SearchProductsPage extends StatefulWidget {
@@ -73,6 +74,7 @@ class _SearchProductsPageState extends State<SearchProductsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -157,10 +159,10 @@ class _SearchProductsPageState extends State<SearchProductsPage> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(product['productDescription']),
-      Text(
-        '฿${(double.tryParse(product['price'].toString()) ?? 0.0).toStringAsFixed(2)}',
-        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink),
-      ),
+Text(
+  "${formatter.format(double.tryParse(product['price'].toString()) ?? 0.00)}", // ✅ ใช้ formatter.format
+  style: TextStyle(color: Colors.pink[600]),
+),
     ],
   ),
 ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'ProductCategory.dart'; // Import for the category page
 import 'ProductDetailPage.dart'; // Import for the product detail page
 import 'ChatList.dart';
@@ -100,8 +101,11 @@ class _HomepageScreenState extends State<HomepageScreen> {
 
   @override
   Widget build(BuildContext context) {
+        final formatter = new NumberFormat("#,##0.00", "th");
     return Scaffold(
       appBar: AppBar(
+      centerTitle: true,
+      automaticallyImplyLeading: false,
 title: GestureDetector(
   onTap: () {
     Navigator.push(
@@ -341,11 +345,10 @@ CircleAvatar(
                                       Padding(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8.0),
-                                        child: Text(
-                                          "Price: ฿${product['price']}",
-                                          style: TextStyle(
-                                              color: Colors.grey[600]),
-                                        ),
+child: Text(
+  "${formatter.format(double.tryParse(product['price'].toString()) ?? 0.00)}", // ✅ ใช้ formatter.format
+  style: TextStyle(color: Colors.pink[600]),
+),
                                       ),
                                     ],
                                   ),

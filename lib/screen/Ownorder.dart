@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart'; 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'dart:convert';
 
 import 'package:loginsystem/screen/AddParcel.dart';
@@ -80,7 +81,7 @@ Future<void> fetchOrders() async {
       appBar: AppBar(
         automaticallyImplyLeading: false, // ลบปุ่มย้อนกลับ
         centerTitle: true, 
-        title: Text('คำสั่งซื้อ', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text('คำสั่งซื้อ', style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
 bottom: TabBar(
@@ -151,7 +152,7 @@ String calculateDueDate(String? shopDate) {
     final difference = dueDate.difference(now);
 
     if (difference.isNegative) {
-      return "หมดเวลาจัดส่งแล้ว";
+      return "การจัดส่งล่าช้าจะทำให้ได้รับสินค้าช้ากว่ากำหนด";
     } else {
       final days = difference.inDays;
       final hours = difference.inHours % 24;
@@ -187,6 +188,7 @@ Future<bool> cancelOrder(String orderRef) async {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Card(
       margin: EdgeInsets.all(8.0),
       child: Padding(
@@ -231,7 +233,7 @@ Future<bool> cancelOrder(String orderRef) async {
               children: [
                 Text("x ${order['quantity']}"),
 Text(
-  "฿${double.tryParse(order['product_price']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
+  "${formatter.format(double.tryParse(order['product_price']?.toString() ?? '0') ?? 0.00)}",
   style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
 ),
 
@@ -243,10 +245,10 @@ Text(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text("1 ชิ้น"),
-                Text(
-                  "รวมทั้งหมด: ฿${(order['total'] != null ? double.tryParse(order['total'].toString())?.toStringAsFixed(2) : '0.00')}",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+Text(
+  "รวมทั้งหมด: ${order['total'] != null ? formatter.format(double.tryParse(order['total'].toString()) ?? 0.00) : '0.00'}",
+  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+),
               ],
             ),
             SizedBox(height: 16),

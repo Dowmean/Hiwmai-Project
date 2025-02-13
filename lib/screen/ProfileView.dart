@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:loginsystem/screen/Chat.dart';
 import 'package:loginsystem/screen/ProductDetailPage.dart';
+import 'package:loginsystem/screen/Totalreview.dart';
 
 class ProfileView extends StatefulWidget {
   final String email; // รับอีเมลเป็นตัวระบุผู้ใช้
@@ -15,35 +16,100 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   String username = '';
   String profilePictureUrl = '';
+  double avgRating = 0.0;
+  int totalReviews = 0;
+  int hiuCount = 0; // ✅ ตัวแปรเก็บจำนวนครั้งที่รับหิ้ว
+  int totalLikes = 0; // ✅ เก็บจำนวนไลก์
   List<dynamic> userPosts = [];
   bool isLoading = true;
+  
 
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
+    _fetchUserReviews();
     _fetchUserPosts();
+    _fetchHiuCount(); // ✅ ดึงจำนวนครั้งที่รับหิ้ว
+    _fetchTotalLikes(); // ✅ ดึงข้อมูลการกดหัวใจ
+
+    
   }
 
   Future<void> _fetchUserProfile() async {
-    final String apiUrl =
-        'http://10.0.2.2:3000/getProfile?email=${widget.email}';
-
+    final String apiUrl = 'http://10.0.2.2:3000/getProfile?email=${widget.email}';
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        //print('API Response (Profile): ${response.body}'); // Debug
-
         setState(() {
           username = data['username'] ?? 'ไม่ทราบชื่อ';
           profilePictureUrl = data['profile_picture'] ?? '';
         });
-      } else {
-        //print('Failed to fetch user profile: ${response.body}');
       }
     } catch (e) {
-      //print('Error fetching user profile: $e');
+      print('Error fetching user profile: $e');
+    }
+  }
+
+  Future<void> _fetchUserReviews() async {
+    final String apiUrl = 'http://10.0.2.2:3000/rateReviews?email=${widget.email}';
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          avgRating = double.parse(data['avg_rating'].toString());
+          totalReviews = data['total_reviews'] ?? 0;
+        });
+      }
+    } catch (e) {
+      print('Error fetching user reviews: $e');
+    }
+  }
+
+  Future<void> _fetchHiuCount() async {
+    final String apiUrl = 'http://10.0.2.2:3000/getHiuCount?email=${widget.email}';
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          hiuCount = data['totalHiuCount'] ?? 0;
+        });
+      }
+    } catch (e) {
+      print('Error fetching hiu count: $e');
+    }
+  }
+
+Future<void> _fetchTotalLikes() async {
+  final String apiUrl = 'http://10.0.2.2:3000/getTotalLikes?email=${widget.email}';
+  try {
+    final response = await http.get(Uri.parse(apiUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        totalLikes = data['totalLikes'] ?? 0;
+      });
+    }
+  } catch (e) {
+    print('Error fetching total likes: $e');
+  }
+}
+
+  Future<void> _fetchUserPosts() async {
+    final String apiUrl = 'http://10.0.2.2:3000/postsByUser?email=${widget.email}';
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          userPosts = data;
+        });
+      }
+    } catch (e) {
+      print('Error fetching user posts: $e');
     } finally {
       setState(() {
         isLoading = false;
@@ -51,114 +117,165 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  Future<void> _fetchUserPosts() async {
-    final String apiUrl =
-        'http://10.0.2.2:3000/postsByUser?email=${widget.email}';
-
-    try {
-      //print('Fetching posts for email: ${widget.email}'); // Debug email
-      final response = await http.get(Uri.parse(apiUrl));
-      //print('API Response Code: ${response.statusCode}'); // Debug status code
-      //print('API Response Body: ${response.body}'); // Debug raw response
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        //print('Parsed Data: $data'); // Debug parsed data
-
-        setState(() {
-          userPosts = data;
-        });
-      } else {
-        //print('Failed to fetch user posts: ${response.body}');
-      }
-    } catch (e) {
-      //print('Error fetching user posts: $e');
-    }
-  }
-
-Widget _displayProfileImage() {
-  if (profilePictureUrl.isNotEmpty) {
+  Widget _displayProfileImage() {
     return CircleAvatar(
       radius: 50,
-      backgroundImage: NetworkImage(profilePictureUrl),
-      onBackgroundImageError: (exception, stackTrace) {
-        //print('Error loading profile picture: $exception');
-      },
-      child: Icon(Icons.person), // เพิ่มไอคอนเริ่มต้นหากโหลดไม่ได้
-    );
-  } else {
-    return CircleAvatar(
-      radius: 50,
-      backgroundImage: AssetImage('assets/avatar.png'),
+      backgroundImage: profilePictureUrl.isNotEmpty
+          ? NetworkImage(profilePictureUrl)
+          : AssetImage('assets/avatar.png') as ImageProvider,
     );
   }
+
+  Widget _buildReviewSection() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.star, color: Colors.amber, size: 30),
+            SizedBox(width: 5),
+            Text(
+              avgRating.toStringAsFixed(1),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(width: 5),
+            Text(
+              "(${totalReviews} รีวิว)",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+      ],
+    );
+  }
+
+  Widget _buildHiuCountSection() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_bag, color: Colors.pink, size: 30),
+            SizedBox(width: 5),
+            Text(
+              "$hiuCount",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.pink),
+            ),
+          ],
+        ),
+        SizedBox(height: 5),
+        Text(
+          "รับหิ้วไปแล้ว",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+  
+Widget _buildFavoriteSection() {
+  return Column(
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.favorite, color: Colors.pink, size: 30),
+          SizedBox(width: 5),
+          Text(
+            "$totalLikes",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.pink),
+          ),
+        ],
+      ),
+      SizedBox(height: 5),
+      Text(
+        "การกดหัวใจ",
+        style: TextStyle(fontSize: 16, color: Colors.grey),
+      ),
+    ],
+  );
 }
 
-
-
-Widget _buildPostCard(dynamic post) {
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProductDetailPage(
-            product: post,
-            onFavoriteUpdate: (updatedProduct) {
-              setState(() {
-                final index =
-                    userPosts.indexWhere((p) => p['id'] == updatedProduct['id']);
-                if (index != -1) {
-                  userPosts[index] = updatedProduct;
-                }
-              });
-            },
+  Widget _buildPostCard(dynamic post) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailPage(
+              product: post,
+              onFavoriteUpdate: (updatedProduct) {
+                setState(() {
+                  final index =
+                      userPosts.indexWhere((p) => p['id'] == updatedProduct['id']);
+                  if (index != -1) {
+                    userPosts[index] = updatedProduct;
+                  }
+                });
+              },
+            ),
           ),
-        ),
-      );
-    },
-    child: Card(
-      elevation: 5,
-      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          post['imageUrl'] != null && post['imageUrl'].isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-                  child: Image.network(
-                    post['imageUrl'], // ใช้ URL
+        );
+      },
+      child: Card(
+        elevation: 5,
+        margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            post['imageUrl'] != null && post['imageUrl'].isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                    child: Image.network(
+                      post['imageUrl'],
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Container(
                     height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      //print('Error loading product image: $error');
-                      return Container(
-                        height: 150,
-                        color: Colors.grey[200],
-                        child: Icon(Icons.broken_image, size: 100),
-                      );
-                    },
+                    color: Colors.grey[200],
+                    child: Icon(Icons.broken_image, size: 100),
                   ),
-                )
-              : Container(
-                  height: 150,
-                  color: Colors.grey[200],
-                  child: Icon(Icons.broken_image, size: 100),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                post['productName'] ?? 'ไม่มีชื่อสินค้า',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+Widget _buildStatCard(IconData icon, String value, String label, {Color? color, VoidCallback? onTap}) {
+  return Expanded(
+    child: GestureDetector( // ✅ ใช้ GestureDetector เพื่อให้สามารถคลิกได้
+      onTap: onTap, // ✅ เมื่อกดที่ Card ให้ทำงานฟังก์ชันที่ส่งมา
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color ?? Colors.pink, size: 24),
+              SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color ?? Colors.pink,
                 ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              post['productName'] ?? 'ไม่มีชื่อสินค้า',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-            child: Text(
-              '฿${post['price']}',
-              style: TextStyle(fontSize: 16, color: Colors.pink),
-            ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -166,20 +283,20 @@ Widget _buildPostCard(dynamic post) {
   );
 }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        centerTitle: true,
-        title: Text('โปรไฟล์ผู้ใช้'),
-        backgroundColor: Colors.pink,
-      ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
+@override 
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      automaticallyImplyLeading: false,
+      centerTitle: true,
+      title: Text('โปรไฟล์ผู้ใช้'),
+      backgroundColor: Colors.pink,
+    ),
+    body: isLoading
+        ? Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(  // ✅ ทำให้หน้าสามารถเลื่อนได้ทั้งหมด
+            child: Column(
               children: [
-                // โปรไฟล์ส่วนบน
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -193,22 +310,43 @@ Widget _buildPostCard(dynamic post) {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      SizedBox(height: 24),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildStatCard(
+                              Icons.star,
+                              avgRating.toStringAsFixed(1),
+                              'ความพึงพอใจ',
+                              color: Colors.amber,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TotalReview(email: widget.email),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildStatCard(
+                              Icons.favorite,
+                              totalLikes.toString(),
+                              'การกดหัวใจ',
+                            ),
+                            _buildStatCard(
+                              Icons.shopping_bag,
+                              hiuCount.toString(),
+                              'รับหิ้วไปแล้ว',
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Divider(),
-                // โพสต์ของผู้ใช้
-                Expanded(
-                  child: userPosts.isEmpty
-                      ? Center(child: Text('ไม่มีโพสต์จากผู้ใช้งาน'))
-                      : ListView.builder(
-                          itemCount: userPosts.length,
-                          itemBuilder: (context, index) {
-                            return _buildPostCard(userPosts[index]);
-                          },
-                        ),
-                ),
-                // ปุ่มพูดคุย
 Padding(
   padding: const EdgeInsets.symmetric(horizontal: 40.0),
   child: ElevatedButton(
@@ -223,18 +361,34 @@ Padding(
         ),
       );
     },
-    style: ElevatedButton.styleFrom(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      backgroundColor: Colors.pink,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(25),
-      ),
-    ),
-    child: Text('คุยกับผู้รับหิ้ว', style: TextStyle(fontSize: 18)),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 99),
+                      backgroundColor: Colors.pink,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text('คุยกับผู้รับหิ้ว', style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ),
+                SizedBox(height: 20), // ✅ เพิ่มระยะห่างให้ปุ่มดูเป็นระเบียบ
+                _buildPostList(), // ✅ ทำให้เลื่อนลงได้
               ],
             ),
-    );
-  }
+          ),
+  );
+}
+
+// ✅ ฟังก์ชันใหม่ `_buildPostList()` 
+Widget _buildPostList() {
+  return ListView.builder(
+    shrinkWrap: true, // ✅ ป้องกันปัญหาเลื่อนผิดปกติ
+    physics: NeverScrollableScrollPhysics(), // ✅ ทำให้ ListView อยู่ใน SingleChildScrollView
+    itemCount: userPosts.length,
+    itemBuilder: (context, index) {
+      return _buildPostCard(userPosts[index]);
+    },
+  );
+}
+
 }

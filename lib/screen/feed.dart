@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:loginsystem/screen/Notifications.dart';
 import 'package:loginsystem/screen/PostCreate.dart';
 import 'package:loginsystem/screen/ProductDetailPage.dart';
 import 'package:loginsystem/screen/Search.dart';
@@ -106,40 +108,65 @@ Widget _displayProfileImage() {
 
   @override
   Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String? currentUserEmail = user?.email; // ✅ ดึงอีเมลของผู้ใช้
+
     return Scaffold(
       body: Column(
         children: [
-          SizedBox(height: 50), // เพิ่มช่องว่างด้านบน
+          SizedBox(height: 50), // ✅ ระยะห่างด้านบน
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SearchProductsPage ()),
-                );
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: Colors.pink),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, color: Colors.pink),
-                    SizedBox(width: 8),
-                    Text(
-                      'ค้นหา',
-                      style: TextStyle(color: Colors.pink, fontSize: 16),
+            child: Row(
+              children: [
+                // ✅ ปรับช่องค้นหาให้มีขนาดเล็กลง โดยใช้ Expanded
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SearchProductsPage()),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(color: Colors.pink),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: Colors.pink),
+                          SizedBox(width: 8),
+                          Text(
+                            'ค้นหา',
+                            style: TextStyle(color: Colors.pink, fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                SizedBox(width: 10), // ✅ เว้นระยะระหว่างช่องค้นหาและไอคอนแจ้งเตือน
+                // ✅ ปุ่มแจ้งเตือน
+                IconButton(
+                  icon: Icon(Icons.notifications, color: Colors.pink, size: 28),
+                  onPressed: currentUserEmail == null
+                      ? null // ปิดการกดปุ่มถ้าไม่มีอีเมล
+                      : () {
+                          debugPrint("🔔 Navigating to NotificationsPage with email: $currentUserEmail");
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => NotificationsPage(email: currentUserEmail!)),
+                          );
+                        },
+                ),
+              ],
             ),
           ),
           Divider(),
+
           if (currentUserRole != 'User')
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -233,6 +260,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: EdgeInsets.all(16),
@@ -296,10 +324,11 @@ class ProductCard extends StatelessWidget {
             post.productName,
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          Text(
-            "ราคา: ฿${post.price.toStringAsFixed(2)}",
-            style: TextStyle(fontSize: 16, color: Colors.pink),
-          ),
+Text(
+  "${formatter.format(double.tryParse(post.price.toString()) ?? 0.00)}", 
+  style: TextStyle(fontSize: 16, color: Colors.pink),
+),
+
           SizedBox(height: 5),
           Center(
             child: ElevatedButton(

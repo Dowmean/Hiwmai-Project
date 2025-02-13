@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'ProductService.dart';
 import 'ProductDetailPage.dart';
 
@@ -124,8 +125,11 @@ Widget _buildProductImage(dynamic imageUrl) {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = new NumberFormat("#,##0.00", "th");
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
+        automaticallyImplyLeading: false,
         title: Text('รายการโปรดของคุณ'),
       ),
       body: RefreshIndicator(
@@ -199,13 +203,10 @@ Navigator.push(
                           Padding(
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 8.0),
-                            child: Text(
-                              "฿$price",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+child: Text(
+  "${formatter.format(double.tryParse(product['price'].toString()) ?? 0.00)}", 
+  style: TextStyle(color: Colors.pink[600]),
+),
                           ),
                         ],
                       ),

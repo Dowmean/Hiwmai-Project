@@ -1,56 +1,39 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:loginsystem/screen/Orderscancle.dart';
 
 class RefundPage extends StatefulWidget {
+  final Map<String, dynamic> order;
+
+  RefundPage({required this.order});
+
   @override
   _RefundPageState createState() => _RefundPageState();
 }
 
 class _RefundPageState extends State<RefundPage> {
-  List<dynamic> canceledOrders = [];
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchCanceledOrders();
-  }
-
-  // ดึงข้อมูลคำสั่งซื้อที่ถูกยกเลิก
-  Future<void> fetchCanceledOrders() async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/OrderscancleAdmin'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          canceledOrders = data['orders'];
-          isLoading = false;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch canceled orders')),
-        );
-        setState(() {
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      //print('Error fetching canceled orders: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred while fetching data.')),
-      );
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  // อัปเดตสถานะคำสั่งซื้อเป็น "คืนเงินแล้ว"
   Future<void> processRefund(String orderRef) async {
+    bool confirmRefund = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('ยืนยันคืนเงิน'),
+        content: Text('คุณต้องการคืนเงินคำสั่งซื้อนี้ใช่หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('ยกเลิก'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('ยืนยัน'),
+          ),
+        ],
+      ),
+    );
+
+    if (!confirmRefund) return; // ถ้าไม่ยืนยัน ให้ออกไปเลย
+
     try {
       final response = await http.put(
         Uri.parse('http://10.0.2.2:3000/refundOrderAdmin'),
@@ -60,24 +43,31 @@ class _RefundPageState extends State<RefundPage> {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Refund processed successfully')),
+          SnackBar(content: Text('คืนเงินสำเร็จ')),
         );
-        fetchCanceledOrders(); // รีเฟรชข้อมูลหลังจากคืนเงินแล้ว
+
+        // กลับไปหน้า OrdersCancelPage และรีเฟรช
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => OrdersCancelPage()),
+          (Route<dynamic> route) => false,
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process refund')),
+          SnackBar(content: Text('คืนเงินไม่สำเร็จ')),
         );
       }
     } catch (e) {
-      //print('Error processing refund: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred while processing refund')),
+        SnackBar(content: Text('เกิดข้อผิดพลาดในการคืนเงิน')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final order = widget.order;
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -85,20 +75,10 @@ class _RefundPageState extends State<RefundPage> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : canceledOrders.isEmpty
-              ? Center(child: Text('ไม่มีคำสั่งซื้อที่ถูกยกเลิก'))
-              : ListView.builder(
-                  itemCount: canceledOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = canceledOrders[index];
-                    return RefundOrderCard(
-                      order: order,
-                      onRefund: processRefund,
-                    );
-                  },
-                ),
+      body: RefundOrderCard(
+        order: order,
+        onRefund: processRefund,
+      ),
     );
   }
 }
@@ -146,7 +126,7 @@ class RefundOrderCard extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              order['productName'] ?? 'No product name',
+              order['productName'] ?? 'ไม่มีชื่อสินค้า',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             Row(
@@ -170,17 +150,50 @@ class RefundOrderCard extends StatelessWidget {
                 ),
               ],
             ),
+            Divider(),
+            // 🔹 เพิ่มกรอบสีชมพูให้ข้อมูลบัญชีธนาคาร
             SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => onRefund(order['order_ref']),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
+            Center(
+              child: Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.pink, width: 2),
                   borderRadius: BorderRadius.circular(10),
+                  color: Colors.pink.shade50, // สีพื้นหลังอ่อน
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Text(
+                        "รายละเอียดข้อมูลชำระเงิน",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.pink),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text("ธนาคาร: ${order['bankname'] ?? 'ไม่พบข้อมูล'}"),
+                    Text("ชื่อบัญชี: ${order['account_name'] ?? 'ไม่พบข้อมูล'}"),
+                    Text("เลขบัญชี: ${order['banknumber'] ?? 'ไม่พบข้อมูล'}"),
+                  ],
+                ),
               ),
-              child: Text("ยืนยันคืนเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
+            ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Spacer(),
+                ElevatedButton(
+                  onPressed: () => onRefund(order['order_ref']),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  ),
+                  child: Text("ยืนยันคืนเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
+                ),
+              ],
             ),
           ],
         ),

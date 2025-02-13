@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
 
 class ToPayOrdersPage extends StatefulWidget {
   @override
@@ -19,30 +20,25 @@ class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
 
   Future<void> fetchToPayOrders() async {
     try {
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/ToPayOrders'),
-      );
+      final response = await http.get(Uri.parse('http://10.0.2.2:3000/ToPayOrders'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        
         setState(() {
-          orders = data['orders'];
+          orders = data['orders'] ?? []; // ✅ ป้องกันกรณี `null`
           isLoading = false;
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch unpaid orders.')),
-        );
         setState(() {
+          orders = [];
           isLoading = false;
         });
       }
     } catch (e) {
-      //print('Error fetching unpaid orders: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while fetching unpaid orders.')),
-      // );
+      print("❌ Error fetching orders: $e");
       setState(() {
+        orders = [];
         isLoading = false;
       });
     }
@@ -60,17 +56,15 @@ class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Order status updated successfully.')),
         );
-        fetchToPayOrders();
+
+        fetchToPayOrders(); // ✅ รีเฟรชรายการหลังอัปเดต
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update order status.')),
         );
       }
     } catch (e) {
-      //print('Error updating order status: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while updating order status.')),
-      // );
+      print("❌ Error updating order status: $e");
     }
   }
 
@@ -80,14 +74,22 @@ class _ToPayOrdersPageState extends State<ToPayOrdersPage> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
-        title: Text('คำสั่งซื้อที่ยังไม่ชำระเงิน', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(
+          'คำสั่งซื้อที่ยังไม่ชำระเงิน',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : orders.isEmpty
-              ? Center(child: Text('No unpaid orders available.'))
+              ? Center(
+                  child: Text(
+                    'ไม่มีรายการสั่งซื้อ',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                )
               : ListView.builder(
                   itemCount: orders.length,
                   itemBuilder: (context, index) {
@@ -112,6 +114,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = NumberFormat("#,##0.00", "th");
     return Card(
       margin: EdgeInsets.all(8.0),
       child: Padding(
@@ -155,7 +158,7 @@ class OrderCard extends StatelessWidget {
               children: [
                 Text("x ${order['quantity']}"),
                 Text(
-                  "฿${double.tryParse(order['product_price']?.toString() ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
+                  "฿${formatter.format(double.tryParse(order['product_price']?.toString() ?? '0') ?? 0.00)}",
                   style: TextStyle(color: Colors.pink, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -166,50 +169,45 @@ class OrderCard extends StatelessWidget {
               children: [
                 Text("รวมคำสั่งซื้อ:"),
                 Text(
-                  "฿${(order['total'] != null ? double.tryParse(order['total'].toString())?.toStringAsFixed(2) : '0.00')}",
+                  "฿${formatter.format(double.tryParse(order['total']?.toString() ?? '0') ?? 0.00)}",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
             ),
             SizedBox(height: 16),
-ElevatedButton(
-  onPressed: () async {
-    try {
-      final response = await http.put(
-        Uri.parse('http://10.0.2.2:3000/updateOrderStatus'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'orderRef': order['order_ref']}),
-      );
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  final response = await http.put(
+                    Uri.parse('http://10.0.2.2:3000/updateOrderStatus'),
+                    headers: {'Content-Type': 'application/json'},
+                    body: json.encode({'orderRef': order['order_ref']}),
+                  );
 
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order status updated successfully.')),
-        );
+                  if (response.statusCode == 200) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Order status updated successfully.')),
+                    );
 
-        // รีเฟรชโดยลบคำสั่งซื้อที่อัปเดตออกจากหน้าจอ
-        onRefresh();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update order status.')),
-        );
-      }
-    } catch (e) {
-      //print('Error updating order status: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('An error occurred while updating order status.')),
-      // );
-    }
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.green,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-  ),
-  child: Text("ยืนยันการชำระเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
-),
-
+                    onRefresh(); // ✅ รีเฟรชข้อมูล
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update order status.')),
+                    );
+                  }
+                } catch (e) {
+                  print("❌ Error updating order status: $e");
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text("ยืนยันการชำระเงิน", style: TextStyle(fontSize: 16, color: Colors.white)),
+            ),
           ],
         ),
       ),
