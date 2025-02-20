@@ -233,3 +233,49 @@ CREATE TABLE purchase (
     confirm_order tinyint(1)
 );
 ```
+#### Table: addresses
+
+sql
+CREATE TABLE addresses (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    firebase_uid   VARCHAR(255) NOT NULL,
+    email          VARCHAR(255) NOT NULL,
+    province       VARCHAR(100) NOT NULL,
+    name           VARCHAR(255) NOT NULL,
+    phone          VARCHAR(20) NOT NULL,
+    address_detail TEXT NOT NULL,
+    district       VARCHAR(100) DEFAULT NULL,
+    subdistrict    VARCHAR(100) NOT NULL,
+    city           VARCHAR(100) DEFAULT NULL,
+    postal_code    VARCHAR(10) DEFAULT NULL,
+    is_default     TINYINT(1) DEFAULT 0,
+    address_type   ENUM('บ้าน','ที่ทำงาน','อื่นๆ') DEFAULT 'บ้าน',
+    INDEX idx_firebase_uid (firebase_uid)
+);
+
+#### Table: bank_accounts
+
+sql
+CREATE TABLE bank_accounts (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    firebase_uid VARCHAR(255) NOT NULL,
+    email        VARCHAR(255) NOT NULL,
+    fullname     VARCHAR(50) NOT NULL,
+    banknumber   VARCHAR(20) NOT NULL,
+    bankname     VARCHAR(50) NOT NULL,
+    is_default   TINYINT(1) DEFAULT 0,
+    INDEX idx_firebase_uid (firebase_uid)
+);
+
+
+#### Table: notifications 
+
+sql
+CREATE TABLE notifications  (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    email      VARCHAR(255) NOT NULL,
+    message    TEXT NOT NULL,
+    is_read    TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
