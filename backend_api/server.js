@@ -93,8 +93,8 @@ app.use(express.json());
 async function getConnection() {
   return await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'Dowmean',
-    password: process.env.DB_PASS || 'Dowmean.1006',
+    user: process.env.DB_USER || '',
+    password: process.env.DB_PASS || '',
     database: process.env.DB_NAME || 'hiwmai'
   });
 }
