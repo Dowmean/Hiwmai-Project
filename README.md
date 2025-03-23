@@ -284,14 +284,23 @@ CREATE TABLE notifications  (
 
 # How to run
 Backend 
+
 1.cd backend_api
+
 ![image](https://github.com/user-attachments/assets/d174e650-f40b-4244-bb81-36963532776c)
+
 2.node server.js
+
 ![image](https://github.com/user-attachments/assets/92710285-2860-4878-ac2a-e80367ff8ea0)
+
 Frontend
+
 ![image](https://github.com/user-attachments/assets/3b2a90ad-7aed-4df0-a09b-5c094004c6f7)
+
 3.flutter clean 
+
 4.flutter pub get
+
 5.flutter run
  
 
