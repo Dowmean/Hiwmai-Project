@@ -302,5 +302,5 @@ Frontend
 4.flutter pub get
 
 5.flutter run
- 
+#ต้องมี api key firebase 
 
