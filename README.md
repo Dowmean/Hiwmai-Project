@@ -235,7 +235,8 @@ CREATE TABLE purchase (
 ```
 #### Table: addresses
 
-sql
+
+```sql
 CREATE TABLE addresses (
     id             INT AUTO_INCREMENT PRIMARY KEY,
     firebase_uid   VARCHAR(255) NOT NULL,
@@ -252,10 +253,10 @@ CREATE TABLE addresses (
     address_type   ENUM('บ้าน','ที่ทำงาน','อื่นๆ') DEFAULT 'บ้าน',
     INDEX idx_firebase_uid (firebase_uid)
 );
-
+```
 #### Table: bank_accounts
 
-sql
+```sql
 CREATE TABLE bank_accounts (
     id           INT AUTO_INCREMENT PRIMARY KEY,
     firebase_uid VARCHAR(255) NOT NULL,
@@ -266,11 +267,12 @@ CREATE TABLE bank_accounts (
     is_default   TINYINT(1) DEFAULT 0,
     INDEX idx_firebase_uid (firebase_uid)
 );
-
+```
 
 #### Table: notifications 
 
-sql
+
+```sql
 CREATE TABLE notifications  (
     id         INT AUTO_INCREMENT PRIMARY KEY,
     email      VARCHAR(255) NOT NULL,
@@ -278,4 +280,4 @@ CREATE TABLE notifications  (
     is_read    TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
+```
