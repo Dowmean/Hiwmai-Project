@@ -2,11 +2,7 @@
 https://www.figma.com/design/DTy5MFAf4dybkcfM2F7avu/Hiwmai?node-id=0-1&t=FdYfKqjGrFyYWViS-1
 
 # Docker
-docker-compose down --volumes --remove-orphans
-
-docker-compose build --no-cache
-
-docker-compose up -d
+https://github.com/Dowmean/65114540288-ST
 
 # SET UP PROJECT
 
