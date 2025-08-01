@@ -1,3 +1,7 @@
+# Figma
+https://www.figma.com/design/DTy5MFAf4dybkcfM2F7avu/Hiwmai?node-id=0-1&t=FdYfKqjGrFyYWViS-1
+
+
 # SET UP PROJECT
 
 ## Install
